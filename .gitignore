@@ -1,1 +1,9 @@
 *.db
+.Rproj.user
+.Rproj
+
+tracker.db*
+.Renviron
+.Rhistory
+.RData
+.sqlite
