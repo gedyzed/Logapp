@@ -2,6 +2,11 @@
 .Rproj.user
 
 tracker.db*
+
+
+.Rproj.user
+.Rproj
+
 .Renviron
 .Rhistory
 .RData
