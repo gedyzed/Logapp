@@ -725,10 +725,8 @@ ui <- function(request) {
                                          options = list(placeholder = "All weeks")),
                           selectizeInput("f_project", "Project code", NULL, multiple = TRUE,
                                          options = list(placeholder = "All projects")),
-                          conditionalPanel(
-                            condition = "input.f_project && input.f_project.length > 0",
-                            selectizeInput("f_budget_line", "Budget line", NULL, multiple = TRUE,
-                                           options = list(placeholder = "Choose budget line(s) for selected project(s)"))),
+                          selectizeInput("f_budget_line", "Budget line", NULL, multiple = TRUE,
+                                         options = list(placeholder = "Select project code(s) first")),
                           selectizeInput("f_person", "Requested by", NULL, multiple = TRUE,
                                          options = list(placeholder = "All requesters")),
                           selectizeInput("f_submitter", "Submitted by", NULL, multiple = TRUE,
