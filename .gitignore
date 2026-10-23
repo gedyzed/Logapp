@@ -5,3 +5,11 @@ tracker.db*
 .Renviron
 .Rhistory
 .RData
+
+.Rproj.user
+.Rproj
+
+.Renviron
+.Rhistory
+.RData
+.sqlite

@@ -1,637 +1,1193 @@
-# Logistics PO Tracker - single-file Shiny application
-# Run from this file's folder: shiny::runApp()
-# Install once: install.packages(c("shiny", "bslib", "DBI", "RSQLite", "DT", "dplyr", "writexl"))
-# No confidential budget ceilings/balances, authentication, or payment execution.
-# Original amounts are USD. Other currencies use per-PO, manually supplied rates.
-# One PO may have several allocations, each with one project and budget line.
-# One payment per PO. Only paid POs appear in the finance paid total.
-
-required_packages <- c("shiny", "bslib", "DBI", "RSQLite", "DT", "dplyr", "writexl")
-missing_packages <- required_packages[!vapply(required_packages, requireNamespace,
-                                              quietly = TRUE, FUN.VALUE = logical(1))]
-if (length(missing_packages)) {
-  stop("Install these R packages first: ", paste(missing_packages, collapse = ", "))
-}
 library(shiny)
 library(bslib)
 library(DBI)
 library(RSQLite)
 library(DT)
 library(dplyr)
-options(scipen = 999)
+library(writexl)
+library(ggplot2)
 
-# A new database is intentional: no migration from the old prototype.
-DB_FILE <- Sys.getenv("PO_TRACKER_DB", unset = file.path(getwd(), "po_tracker_v1.sqlite"))
-BATCH <- "Main batch"
-CURRENCIES <- c("USD", "ETB", "EUR", "GBP")
-STAGES <- c("waiting", "under validation", "paid", "cancelled")
-STAGE_LABELS <- c("Waiting" = "waiting", "Under validation" = "under validation",
-                  "Paid" = "paid", "Cancelled" = "cancelled")
-DEPARTMENTS <- c("REACH", "PANDA", "ACTED")
-SCENARIOS <- c("Not specified" = "", "A - Direct purchase" = "A",
-               "B - Quotations" = "B", "C - Contract" = "C",
-               "D - National/local tender" = "D", "E - International tender" = "E",
-               "G - Framework agreement" = "G")
+options(scipen = 999)          # never show scientific notation
 
-text <- function(x) {
-  if (is.null(x) || length(x) != 1L || is.na(x)) return("")
-  trimws(as.character(x))
+# Resolve the database next to this application by default. Set TRACKER_DB_PATH to use a shared database stored elsewhere.
+script_file <- local({
+  args <- commandArgs(trailingOnly = FALSE)
+  file_arg <- grep("^--file=", args, value = TRUE)
+  if (length(file_arg)) sub("^--file=", "", file_arg[[1]]) else {
+    frames <- sys.frames()
+    ofiles <- vapply(frames, function(fr) if (!is.null(fr$ofile)) as.character(fr$ofile) else "", character(1))
+    ofiles <- ofiles[nzchar(ofiles)]
+    if (length(ofiles)) ofiles[[length(ofiles)]] else ""
+  }
+})
+APP_DIR <- if (nzchar(script_file) && file.exists(script_file)) dirname(normalizePath(script_file, mustWork = TRUE)) else normalizePath(getwd(), mustWork = FALSE)
+db_override <- Sys.getenv("TRACKER_DB_PATH", unset = "")
+if (nzchar(db_override)) {
+  override_path <- path.expand(db_override)
+  if (!file.exists(override_path)) {
+    stop("TRACKER_DB_PATH points to a database file that does not exist: ", override_path,
+         ". Check the path instead of silently starting with an empty database.")
+  }
+  DB <- normalizePath(override_path, mustWork = TRUE)
+} else {
+  # Prefer an existing production/local database with actual requests. If no populated
+  # tracker.db exists, use the separate synthetic demo database shipped with the app.
+  # This keeps demo rows out of an existing database and makes a fresh install visual.
+  db_candidates <- unique(c(file.path(APP_DIR, "tracker.db"), file.path(getwd(), "tracker.db")))
+  existing_db <- db_candidates[file.exists(db_candidates)]
+  has_rows <- function(path) {
+    tryCatch({
+      cn <- DBI::dbConnect(RSQLite::SQLite(), path)
+      on.exit(DBI::dbDisconnect(cn), add = TRUE)
+      "expenses" %in% DBI::dbListTables(cn) &&
+        DBI::dbGetQuery(cn, "SELECT COUNT(*) AS n FROM expenses")$n[[1]] > 0
+    }, error = function(e) FALSE)
+  }
+  populated_db <- existing_db[vapply(existing_db, has_rows, logical(1))]
+  demo_db <- file.path(APP_DIR, "tracker_demo.db")
+  if (length(populated_db)) {
+    DB <- populated_db[[1]]
+  } else if (file.exists(demo_db) && file.info(demo_db)$size > 0) {
+    DB <- demo_db
+    message("No populated tracker.db found; displaying the bundled synthetic demo dataset.")
+  } else if (length(existing_db)) {
+    DB <- existing_db[[1]]
+  } else {
+    DB <- file.path(APP_DIR, "tracker.db")
+  }
+  DB <- normalizePath(DB, mustWork = FALSE)
 }
-number_ok <- function(x) is.numeric(x) && length(x) == 1L && !is.na(x) && is.finite(x)
-date_ok <- function(x) inherits(x, "Date") && length(x) == 1L && !is.na(x)
-iso_date <- function(x) if (date_ok(x)) as.character(x) else NA_character_
-num_or_na <- function(x) if (number_ok(x)) as.numeric(x) else NA_real_
-stamp <- function() format(Sys.time(), "%Y-%m-%d %H:%M:%S", tz = "UTC")
-money <- function(x) ifelse(is.na(x), "Rate missing", formatC(x, digits = 2,
-                                                              format = "f", big.mark = ","))
-stage_label <- function(x) unname(setNames(names(STAGE_LABELS), STAGE_LABELS)[x])
+message("Expense Tracker SQLite database: ", DB)
+CUR    <- c("ETB", "USD", "EUR", "GBP")
+STATUS <- c("waiting", "under validation", "paid", "rejected")
+DEPTS  <- c("REACH", "PANDA", "ACTED")
 
-connect_db <- function() {
-  cx <- DBI::dbConnect(RSQLite::SQLite(), DB_FILE)
-  DBI::dbExecute(cx, "PRAGMA foreign_keys = ON")
-  DBI::dbExecute(cx, "PRAGMA busy_timeout = 5000")
-  cx
+# values the new-request form starts with
+DEFAULTS <- list(submitted_by = "Betty T", currency = "ETB", country = "ETH")
+
+SCEN_NAME <- c(
+  A = "Direct purchase", B = "Quotations", C = "Contract",
+  D = "National/Local call for tender", E = "International call for tender",
+  G = "Framework agreement"
+)
+LEAD <- c(A = "< 1 week", B = "~2-3 weeks", C = "~2-3 weeks",
+          D = "~1.5 months", E = "~2 months", G = "~2 months")
+# Units per 1 USD. VERIFY these before real use. Each request stores its own rate.
+RATES <- c(ETB = 155, USD = 1, EUR = 0.92, GBP = 0.79)
+
+STATUS_COL <- c(waiting = "#94a3b8", `under validation` = "#f59e0b",
+                paid = "#16a34a", rejected = "#dc2626")
+DIMS <- c(Project = "project_code", Requester = "requested_by",
+          Department = "department")
+
+`%||%` <- function(a, b) if (is.null(a)) b else a
+
+month_choices <- function() {
+  m <- seq(as.Date(format(Sys.Date(), "%Y-%m-01")), by = "-1 month", length.out = 24)
+  setNames(format(m, "%Y-%m"), format(m, "%B %Y"))
 }
-initialize_db <- function() {
-  cx <- connect_db(); on.exit(DBI::dbDisconnect(cx))
-  DBI::dbExecute(cx, "CREATE TABLE IF NOT EXISTS po_requests (
+
+# A <500 | B 500-<5k | C 5k-<30k | D 30k-<150k | E >=150k | G if framework
+scenario <- function(usd, waiver) {
+  usd    <- as.numeric(usd)
+  waiver <- as.character(waiver)
+  base <- as.character(cut(usd, c(-Inf, 500, 5000, 30000, 150000, Inf),
+                           labels = c("A", "B", "C", "D", "E"), right = FALSE))
+  as.character(ifelse(waiver %in% "Framework agreement", "G", base))
+}
+
+# ---- number formatting -----------------------------------------------------
+abbr <- function(x) {   # 1,250,000 -> 1.25M
+  tr <- function(y, suf) paste0(sub("\\.?0+$", "", formatC(y, format = "f", digits = 2)), suf)
+  ifelse(abs(x) >= 1e9, tr(x / 1e9, "B"),
+         ifelse(abs(x) >= 1e6, tr(x / 1e6, "M"),
+                ifelse(abs(x) >= 1e3, tr(x / 1e3, "K"), tr(x, ""))))
+}
+money <- function(x) formatC(x, format = "f", digits = 2, big.mark = ",")
+
+# ---- database ---------------------------------------------------------------
+con <- function() {
+  cn <- dbConnect(SQLite(), DB)
+  dbGetQuery(cn, "PRAGMA busy_timeout = 5000")
+  cn
+}
+
+init_db <- function() {
+  cn <- con(); on.exit(dbDisconnect(cn))
+  dbExecute(cn, "CREATE TABLE IF NOT EXISTS expenses(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    batch TEXT NOT NULL, description TEXT NOT NULL,
-    requested_by TEXT NOT NULL, submitted_by TEXT NOT NULL,
-    department TEXT NOT NULL, country TEXT NOT NULL, location TEXT NOT NULL,
-    order_date TEXT NOT NULL, processing_date TEXT,
-    order_form TEXT, po_reference TEXT, po_reason TEXT, po_date TEXT,
-    supplier TEXT, unit TEXT, quantity REAL,
-    amount_usd REAL NOT NULL CHECK(amount_usd > 0),
-    status TEXT NOT NULL CHECK(status IN ('waiting','under validation','paid','cancelled')),
-    scenario TEXT, waiver TEXT, finance_date TEXT, payment_date TEXT,
-    remarks TEXT, program_remarks TEXT, cancellation_reason TEXT,
-    rate_etb REAL, rate_eur REAL, rate_gbp REAL, rate_date TEXT,
-    created TEXT NOT NULL, updated TEXT NOT NULL,
-    version INTEGER NOT NULL DEFAULT 1)")
-  DBI::dbExecute(cx, "CREATE TABLE IF NOT EXISTS po_allocations (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    po_id INTEGER NOT NULL REFERENCES po_requests(id) ON DELETE CASCADE,
-    project_code TEXT NOT NULL, budget_line TEXT NOT NULL,
-    amount_usd REAL NOT NULL CHECK(amount_usd > 0))")
-  DBI::dbExecute(cx, "CREATE INDEX IF NOT EXISTS idx_alloc_po ON po_allocations(po_id)")
-  DBI::dbExecute(cx, "CREATE TABLE IF NOT EXISTS app_revision (
-    id INTEGER PRIMARY KEY CHECK(id = 1), revision INTEGER NOT NULL)")
-  DBI::dbExecute(cx, "INSERT OR IGNORE INTO app_revision VALUES (1, 0)")
+    description TEXT, project_code TEXT, budget_line TEXT,
+    country TEXT, location TEXT, department TEXT, reason TEXT,
+    order_form TEXT, po TEXT, requested_by TEXT, submitted_by TEXT,
+    status TEXT, waiver TEXT, supplier TEXT, unit TEXT, quantity REAL,
+    amount REAL, currency TEXT, usd REAL, rate_used REAL,
+    order_date TEXT, po_date TEXT, payment_date TEXT, remarks TEXT,
+    created TEXT, updated TEXT)")
+  # upgrade an older database that lacks the two new columns
+  for (k in setdiff(c("usd", "rate_used"), dbListFields(cn, "expenses")))
+    dbExecute(cn, sprintf("ALTER TABLE expenses ADD COLUMN %s REAL", k))
+  dbExecute(cn, "CREATE TABLE IF NOT EXISTS projects(
+    project_code TEXT PRIMARY KEY, department TEXT, location TEXT)")
 }
-initialize_db()
-read_requests <- function() {
-  cx <- connect_db(); on.exit(DBI::dbDisconnect(cx))
-  DBI::dbGetQuery(cx, "SELECT * FROM po_requests ORDER BY id DESC")
+init_db()
+
+db_get <- function(sql, ...) {
+  cn <- con(); on.exit(dbDisconnect(cn)); a <- list(...)
+  dbGetQuery(cn, sql, params = if (length(a)) a)
 }
-read_allocations <- function() {
-  cx <- connect_db(); on.exit(DBI::dbDisconnect(cx))
-  DBI::dbGetQuery(cx, "SELECT * FROM po_allocations ORDER BY id")
+now <- function() format(Sys.time(), "%Y-%m-%d %H:%M:%OS3")
+
+fmt <- function(d) format(d, "%d-%m-%Y")
+v   <- function(x) if (is.null(x) || !length(x) || is.na(x)) "" else trimws(x)
+nz  <- function(x) if (nzchar(v(x))) v(x) else NA_character_
+has_date <- function(d) !is.null(d) && length(d) == 1 && !is.na(d)
+has_num  <- function(x) !is.null(x) && length(x) == 1 && !is.na(x)
+uniq <- function(x) { x <- as.character(x); sort(unique(x[!is.na(x) & nzchar(x)])) }
+with_sel <- function(ch, sel) { miss <- setdiff(sel, ch); c(ch, setNames(miss, miss)) }
+
+date_in <- function(id, label, value = NA, ...)
+  suppressWarnings(dateInput(id, label, value = value, format = "dd-mm-yyyy", ...))
+
+# Order form / PO references. Country is optional and skipped when empty.
+mk_ref <- function(r, kind = c("OF", "PO")) {
+  kind <- match.arg(kind)
+  g <- function(k) v(r[[k]])
+  if (!all(nzchar(c(g("project_code"), g("budget_line"), g("location"), g("department")))))
+    return(NA_character_)
+  parts <- c(g("project_code"), g("budget_line"), g("country"), g("location"), g("department"))
+  parts <- paste(parts[nzchar(parts)], collapse = "/")
+  if (kind == "OF") {
+    d <- suppressWarnings(as.Date(g("order_date")))
+    if (is.na(d)) return(NA_character_)
+    paste0("OF/", parts, "/", fmt(d))
+  } else {
+    d <- suppressWarnings(as.Date(g("po_date")))
+    if (is.na(d) || !nzchar(g("reason"))) return(NA_character_)
+    paste0("PO/OF/", parts, "/", g("reason"), "/", fmt(d))
+  }
 }
 
+# short fields whose dropdowns are filled from the shared database
+CACHE <- list(
+  requested_by = c("requested_by", "submitted_by"),
+  submitted_by = c("requested_by", "submitted_by"),
+  project_code = "project_code", budget_line = "budget_line",
+  country = "country", location = "location",
+  supplier = "supplier", unit = "unit"
+)
+cache_choices <- function(d, id) uniq(unlist(d[CACHE[[id]]], use.names = FALSE))
 
-read_dataset <- function() {
-  cx <- connect_db(); on.exit(DBI::dbDisconnect(cx))
-  DBI::dbWithTransaction(cx, {
-    list(requests = DBI::dbGetQuery(cx, "SELECT * FROM po_requests ORDER BY id DESC"),
-         allocations = DBI::dbGetQuery(cx, "SELECT * FROM po_allocations ORDER BY id"))
-  })
+# ---- UI helpers ---------------------------------------------------------------
+R   <- function(x) paste0(x, " *")
+OPT <- function(x) x
+col <- function(n, ...) div(class = paste0("c", n), ...)
+
+cached <- function(id, label, req = TRUE) {
+  d <- DEFAULTS[[id]]
+  selectizeInput(id, if (req) R(label) else OPT(label), choices = d, selected = d,
+                 width = "100%",
+                 options = list(create = TRUE, placeholder = "Type or pick"))
 }
+pick <- function(id, label, choices)
+  selectInput(id, R(label), c("Select" = "", choices),
+              selected = DEFAULTS[[id]] %||% "", width = "100%")
 
-# White/blue application styling; replace the accent with an approved brand value if supplied.
-css <- "
-:root{--accent:#005baa;--ink:#172b4d;--line:#e3e9f0}
-body{background:#f5f7fa;color:var(--ink);font-family:system-ui,-apple-system,'Segoe UI',sans-serif;font-size:15px}
-.navbar{background:white!important;border-bottom:1px solid var(--line);box-shadow:none}
-.navbar-brand{font-weight:700;color:var(--accent)!important;font-size:1.15rem}
-.navbar .nav-link{font-weight:500;padding:.9rem 1rem!important}
-.navbar .nav-link.active{color:var(--accent)!important;background:#f0f6fc;border-radius:5px}
-.wrap{max-width:1440px;margin:0 auto;padding:26px 18px 50px}
-.heading{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:22px;flex-wrap:wrap}
-h2{font-size:1.6rem;font-weight:650;margin:0 0 5px}h3{font-size:1.05rem;font-weight:650}
-.subtle{color:#607087;font-size:.9rem}.panel{background:white;border:1px solid var(--line);border-radius:8px;padding:22px;margin-bottom:18px}
-.metrics{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-bottom:20px}
-.metric{background:white;border:1px solid var(--line);border-radius:8px;padding:17px}.metric strong{display:block;font-size:1.7rem;margin-top:5px;color:var(--accent)}
-.filters{display:grid;grid-template-columns:2fr repeat(4,minmax(120px,1fr));gap:12px;align-items:end}
-.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 22px}.full{grid-column:1/-1}
-.shiny-input-container{width:100%!important}.control-label{font-size:.88rem;font-weight:550;margin-bottom:6px}
-.form-control,.form-select,.selectize-input{border-color:#d6dfe9;border-radius:5px;box-shadow:none}
-.form-control:focus,.form-select:focus{border-color:var(--accent);box-shadow:0 0 0 3px #005baa18}
-.btn{border-radius:5px;font-weight:550}.btn-primary{background:var(--accent);border-color:var(--accent)}
-.actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.section-title{border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:18px}
-.alloc-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;border-bottom:1px solid #edf0f4;padding-top:8px}
-.notice{background:#f0f6fc;border-left:3px solid var(--accent);padding:12px 15px;margin-bottom:16px;font-size:.9rem}
-.error-list{background:#fff4f3;color:#a32b25;border:1px solid #f0ccc8;border-radius:6px;padding:14px 20px;margin-bottom:16px}
-.badge-stage{display:inline-block;padding:4px 9px;border-radius:4px;font-size:.82rem;font-weight:600;white-space:nowrap}
-.stage-waiting{background:#fff3d6;color:#805500}.stage-under-validation{background:#e9f2ff;color:#005baa}
-.stage-paid{background:#e9f6ed;color:#216b3b}.stage-cancelled{background:#f0f1f3;color:#59616d}
-table.dataTable tbody td{vertical-align:middle;font-size:.9rem}table.dataTable thead th{font-size:.82rem;background:#f7f9fc;color:#52647b}
-.detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 24px}.detail-label{font-size:.78rem;color:#607087;margin-bottom:3px}.detail-value{white-space:pre-wrap;overflow-wrap:anywhere}
-@media(max-width:1000px){.filters{grid-template-columns:repeat(3,minmax(0,1fr))}.metrics{grid-template-columns:repeat(3,1fr)}}
-@media(max-width:650px){.wrap{padding:18px 10px}.panel{padding:16px}.form-grid,.detail-grid,.alloc-row{grid-template-columns:1fr}.metrics{grid-template-columns:repeat(2,1fr)}.filters{grid-template-columns:1fr 1fr}}
-"
-
-field <- function(label, value) {
-  if (!length(value) || is.na(value) || !nzchar(as.character(value))) value <- "Not recorded"
-  div(div(class = "detail-label", label), div(class = "detail-value", as.character(value)))
-}
-section <- function(title, ...) div(class = "panel", h3(class = "section-title", title), ...)
-blank_date <- function(id, label) dateInput(id, label, value = NA, format = "dd M yyyy")
-
-ui <- page_navbar(
-  title = "Logistics PO Tracker", id = "nav", selected = "requests", fillable = FALSE,
-  theme = bs_theme(version = 5, primary = "#005baa", bg = "#f5f7fa", fg = "#172b4d"),
-  header = tags$head(tags$style(HTML(css))),
-  nav_panel("Requests", value = "requests", div(class = "wrap",
-                                                div(class = "heading", div(h2("Purchase orders"),
-                                                                           div(class = "subtle", "Record, review and track logistics requests.")),
-                                                    actionButton("new_po", "Record new PO", class = "btn-primary")),
-                                                uiOutput("metrics"),
-                                                div(class = "panel",
-                                                    div(class = "filters",
-                                                        textInput("search", "Search", placeholder = "ID, description, reference or person"),
-                                                        selectInput("f_status", "Stage", c("All stages" = "", STAGE_LABELS)),
-                                                        selectInput("f_project", "Project", c("All projects" = "")),
-                                                        selectInput("f_budget", "Budget line", c("All budget lines" = "")),
-                                                        selectInput("f_location", "Location", c("All locations" = ""))),
-                                                    div(class = "form-grid",
-                                                        blank_date("f_from", "Request date from"), blank_date("f_to", "Request date to")),
-                                                    div(class = "actions", actionButton("clear_filters", "Clear filters"),
-                                                        downloadButton("export", "Export filtered workbook"))),
-                                                div(class = "panel", div(class = "heading", div(h3("Request register"),
-                                                                                                textOutput("row_count")), div(class = "actions",
-                                                                                                                              actionButton("open_po", "Open selected"), actionButton("edit_po", "Edit selected"))),
-                                                    p(class = "subtle", "Select a row, then open or edit it. All amounts below are original USD amounts."),
-                                                    DTOutput("register"))
-  )),
-  nav_panel("Finance summary", value = "finance", div(class = "wrap",
-                                                      div(class = "heading", div(h2("Amounts by budget line"),
-                                                                                 div(class = "subtle", "Current-stage snapshot for the filtered requests.")),
-                                                          downloadButton("finance_export", "Export finance workbook")),
-                                                      div(class = "notice", "No confidential budget ceilings or available balances are stored. Only the Paid column is included in the finance paid total. This is a cumulative snapshot, not an instruction to deduct the same records again."),
-                                                      div(class = "panel", selectInput("report_currency", "Display currency", CURRENCIES,
-                                                                                       selected = "USD", width = "220px"),
-                                                          p(class = "subtle", "Uses each PO's saved units-per-USD rate. USD remains the original amount. Filters on Requests apply here too."),
-                                                          uiOutput("conversion_warning"), DTOutput("finance_table"))
-  )),
-  nav_panel_hidden(value = "form", div(class = "wrap",
-                                       div(class = "heading", div(h2(textOutput("form_title", inline = TRUE)),
-                                                                  div(class = "subtle", "Complete the record before saving. * Required; other fields are optional.")),
-                                           actionButton("back", "Back to requests")),
-                                       uiOutput("form_errors"),
-                                       section("1. Request details", div(class = "form-grid",
-                                                                         div(class = "full", textAreaInput("description", "Description *", rows = 3)),
-                                                                         textInput("requested_by", "Requested by *"), textInput("submitted_by", "Logistics focal point *"),
-                                                                         selectInput("department", "Department *", c("Select" = "", DEPARTMENTS)),
-                                                                         textInput("country", "Country *", "ETH"), textInput("location", "Location / area *"),
-                                                                         dateInput("order_date", "Order form / request date *", Sys.Date(), format = "dd M yyyy"),
-                                                                         blank_date("processing_date", "Processing date"), textInput("order_form", "Order form reference"),
-                                                                         numericInput("quantity", "Quantity", NA, min = 0), textInput("unit", "Unit"))),
-                                       section("2. Amount and project / budget allocation",
-                                               div(class = "notice", "Enter the original PO total in USD. For multiple budgets, add allocation rows. Their USD amounts must equal the PO total. Each row contains one project and one budget line."),
-                                               numericInput("amount_usd", "Total PO amount (USD) *", NA, min = 0, step = 0.01),
-                                               uiOutput("allocation_inputs"),
-                                               div(class = "actions", actionButton("add_allocation", "Add another budget allocation"),
-                                                   actionButton("remove_allocation", "Remove last allocation")),
-                                               uiOutput("allocation_total")),
-                                       section("3. Procurement and payment",
-                                               div(class = "actions", actionButton("suggest_scenario", "Suggest scenario from USD total"),
-                                                   actionButton("draft_refs", "Generate draft references")),
-                                               p(class = "subtle", "Suggestions use the prototype rules, not a policy check. Existing references are never overwritten. Confirm drafts before saving."),
-                                               uiOutput("scenario_hint"), div(class = "form-grid",
-                                                                              textInput("supplier", "Supplier"), selectInput("scenario", "Procurement scenario", SCENARIOS),
-                                                                              selectInput("waiver", "Memo / waiver", c("No", "Framework agreement", "Other")),
-                                                                              textInput("po_reason", "PO reason"), textInput("po_reference", "Purchase order / contract reference"),
-                                                                              blank_date("po_date", "Purchase order date"), selectInput("status", "Stage *", STAGE_LABELS),
-                                                                              blank_date("finance_date", "Submitted to finance date"),
-                                                                              conditionalPanel("input.status == 'paid'", blank_date("payment_date", "Payment date *")),
-                                                                              conditionalPanel("input.status == 'cancelled'", textInput("cancellation_reason", "Cancellation reason")))),
-                                       section("4. Currency conversions",
-                                               p(class = "subtle", "Optional: enter approved units per 1 USD, not the inverse. No live or example rates are supplied. These rates are saved with this PO; editing them does not change other POs."),
-                                               div(class = "form-grid", numericInput("rate_etb", "ETB per 1 USD", NA, min = 0),
-                                                   numericInput("rate_eur", "EUR per 1 USD", NA, min = 0),
-                                                   numericInput("rate_gbp", "GBP per 1 USD", NA, min = 0), blank_date("rate_date", "Exchange-rate date"),
-                                                   selectInput("preview_currency", "Preview currency", CURRENCIES, selected = "USD"),
-                                                   uiOutput("currency_preview"))),
-                                       section("5. Remarks", div(class = "form-grid",
-                                                                 textAreaInput("remarks", "Logistics remarks", rows = 3),
-                                                                 textAreaInput("program_remarks", "Program / other staff remarks", rows = 3))),
-                                       div(class = "panel actions", actionButton("save_po", "Save PO", class = "btn-primary"),
-                                           actionButton("cancel_form", "Cancel"), span(class = "subtle", "One batch: Main batch. One payment per PO."))
-  ))
+app_theme <- bs_theme(
+  version = 5,
+  bg = "#ffffff",
+  fg = "#09090b",
+  primary = "#0284c7", # shadcn Sky
+  secondary = "#f4f4f5", # shadcn Zinc
+  base_font = font_google("Inter"),
+  heading_font = font_google("Inter"),
+  "border-radius" = "0.6rem"
 )
 
+css <- "
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+:root{
+  --app-bg:#fafafa; --app-card-bg:#ffffff; --app-input-bg:#ffffff;
+  --app-border:#d4d4d8; --app-muted:#f4f4f5; --app-muted-fg:#52525b;
+  --app-accent:#0284c7; --app-accent-soft:#e0f2fe; --app-radius:.6rem;
+}
+[data-bs-theme='dark']{
+  --app-bg:#09090b; --app-card-bg:#18181b; --app-input-bg:#18181b;
+  --app-border:#52525b; --app-muted:#27272a; --app-muted-fg:#d4d4d8;
+  --app-accent:#38bdf8; --app-accent-soft:#082f49;
+  --bs-body-bg:#09090b; --bs-body-color:#fafafa; --bs-secondary-color:#d4d4d8;
+  --bs-tertiary-bg:#27272a; --bs-border-color:#52525b; --bs-card-bg:#18181b;
+}
+html,body,.navbar,.btn,.form-control,.form-select,.selectize-input,.selectize-dropdown{
+  font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+}
+body{background:var(--bs-body-bg);color:var(--bs-body-color);font-size:.94rem}
+.bslib-grid>*{min-width:0}
+.navbar{border-bottom:1px solid var(--app-border);box-shadow:none;background:var(--bs-body-bg)}
+.navbar .container-fluid{max-width:1800px}
+a.brand{font-weight:700;letter-spacing:-.035em;color:var(--bs-body-color)!important;text-decoration:none;font-size:1.05rem}
+.navbar .nav-link[data-value='requests']{font-weight:600;color:var(--bs-body-color)!important}
+.navbar .nav-link[data-value='new']{display:none!important}
+.navbar .nav-link.active[data-value='requests']{color:var(--app-accent)!important;background:transparent}
+.page-shell{width:100%;max-width:1760px;margin:0 auto;padding:1.3rem clamp(1rem,2.2vw,2.5rem) 2.5rem}
+.page-heading{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:1.15rem}
+.page-heading h1{font-size:1.55rem;font-weight:650;letter-spacing:-.04em;margin:0}
+.page-heading p{color:var(--app-muted-fg);margin:.3rem 0 0;font-size:.9rem}
+.toolbar{display:flex;align-items:center;gap:.65rem;flex-wrap:wrap;margin:1.15rem 0 1.2rem}
+.toolbar .shiny-input-container{margin:0}
+.toolbar .btn{min-height:2.45rem}
+.filter-dd .dropdown-menu{width:min(94vw,600px);max-height:75vh;overflow-y:auto;border:1px solid var(--app-border);border-radius:var(--app-radius);box-shadow:0 14px 35px rgba(0,0,0,.12)}
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:.15rem .85rem}
+.fgrid .wide{grid-column:1/-1}
+.fgrid .shiny-input-container{width:100%;margin:.15rem 0 .65rem}
+.fgrid .control-label{font-size:.78rem;font-weight:600;color:var(--app-muted-fg)}
+@media(max-width:620px){.fgrid{grid-template-columns:1fr}.fgrid .wide{grid-column:auto}}
+.btn-primary{--bs-btn-bg:#0284c7;--bs-btn-border-color:#0284c7;--bs-btn-hover-bg:#0369a1;--bs-btn-hover-border-color:#0369a1;--bs-btn-active-bg:#075985;font-weight:600;color:#fff!important}
+.btn-primary:hover,.btn-primary:focus,.btn-primary:active,.btn-primary:disabled,[data-bs-theme='dark'] .btn-primary{color:#fff!important}
+[data-bs-theme='dark'] .btn-primary{--bs-btn-bg:#0284c7;--bs-btn-border-color:#0284c7;--bs-btn-hover-bg:#0369a1;--bs-btn-hover-border-color:#0369a1}
+.btn-outline-secondary{border-color:var(--app-border);color:var(--bs-body-color);font-weight:500}
+.btn-outline-secondary:hover{background:var(--app-muted);border-color:var(--app-border);color:var(--bs-body-color)}
+.card{border:1px solid var(--app-border);border-radius:var(--app-radius);box-shadow:none;background:var(--bs-card-bg,var(--bs-body-bg));min-width:0}
+.card-header{padding:1rem 1.15rem;background:transparent;border-bottom:1px solid var(--app-border);font-weight:600}
+.card-body{padding:1.1rem 1.15rem}
+.metrics-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:.8rem;margin-bottom:1rem}
+@media(max-width:1150px){.metrics-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:720px){.metrics-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:440px){.metrics-grid{grid-template-columns:1fr}}
+.metric-card{height:100%;padding:1rem 1.1rem;border:1px solid var(--app-border);border-radius:var(--app-radius);background:var(--bs-body-bg);min-width:0}
+.metric-label{font-size:.82rem;font-weight:500;color:var(--app-muted-fg);margin:0 0 .45rem}
+.metric-value{font-size:clamp(1.25rem,1.65vw,1.75rem);font-weight:650;letter-spacing:-.045em;line-height:1.15;overflow-wrap:anywhere;margin:0}
+.metric-note{font-size:.78rem;color:var(--app-muted-fg);margin:.4rem 0 0}
+.chart-card .card-body{padding:.75rem 1rem 1rem}
+.chart-note{color:var(--app-muted-fg);font-size:.82rem;margin:-.25rem 0 .5rem}
+.table-head{display:flex;align-items:center;justify-content:space-between;gap:.8rem;flex-wrap:wrap}
+.table-head .buttons{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+.nav-tabs{border-bottom:1px solid var(--app-border);gap:.2rem;flex-wrap:wrap}
+.nav-tabs .nav-link{border:0;border-radius:.45rem .45rem 0 0;color:var(--app-muted-fg);font-weight:500;padding:.65rem .9rem}
+.nav-tabs .nav-link.active{color:var(--bs-body-color);background:var(--app-muted);border-bottom:2px solid var(--app-accent)}
+.tab-content{padding-top:.9rem}
+.dataTables_wrapper{width:100%;min-width:0}
+table.dataTable{width:100%!important;border-collapse:separate!important;border-spacing:0}
+table.dataTable thead th{font-size:.78rem;color:var(--app-muted-fg);font-weight:600;border-bottom:1px solid var(--app-border)!important;background:var(--bs-body-bg)}
+table.dataTable tbody td{font-size:.86rem;vertical-align:middle;border-bottom:1px solid var(--app-border)!important;max-width:260px}
+table.dataTable tbody tr:hover{background:var(--app-muted)!important}
+table.dataTable tbody tr.selected>*{box-shadow:inset 0 0 0 9999px var(--app-accent-soft)!important;color:var(--bs-body-color)!important}
+a.dmore{color:var(--app-accent);font-weight:600;font-size:.8rem;text-decoration:none;white-space:nowrap}
+.dt-top{display:flex;justify-content:flex-end;margin-bottom:.8rem}
+.dt-foot{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.75rem;margin-top:.8rem;color:var(--app-muted-fg);font-size:.82rem}
+div.dataTables_wrapper div.dataTables_filter{margin:0}
+div.dataTables_wrapper div.dataTables_filter input{min-width:min(280px,55vw);margin-left:0!important;padding:.48rem .7rem;border-radius:.5rem;border:1px solid var(--app-border)!important;background:var(--bs-body-bg)!important;color:var(--bs-body-color);outline:none;box-shadow:none}
+div.dataTables_wrapper div.dataTables_filter input:focus{border-color:var(--app-accent)!important;box-shadow:0 0 0 3px rgba(2,132,199,.14)!important}
+.dataTables_wrapper .dataTables_paginate ul.pagination{gap:.3rem;margin:0}
+.dataTables_wrapper .dataTables_paginate .paginate_button{border:0!important;padding:0!important;margin:0!important;background:transparent!important}
+.dataTables_wrapper .dataTables_paginate .page-link{border:1px solid var(--app-border)!important;border-radius:.45rem!important;padding:.28rem .7rem;color:var(--bs-body-color)!important;background:transparent!important}
+.dataTables_wrapper .dataTables_paginate .active .page-link{background:var(--app-accent)!important;border-color:var(--app-accent)!important;color:#fff!important}
+.fg{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:.1rem 1rem}
+.c3{grid-column:span 3}.c4{grid-column:span 4}.c5{grid-column:span 5}.c6{grid-column:span 6}.c8{grid-column:span 8}.c12{grid-column:span 12}
+@media(max-width:900px){.fg>.c3,.fg>.c4,.fg>.c5{grid-column:span 6}}
+@media(max-width:560px){.fg>*{grid-column:span 12!important}}
+.nr .control-label{display:block;font-size:.78rem;font-weight:600;margin-bottom:.35rem;color:var(--bs-body-color)}
+.nr .shiny-input-container{margin-bottom:.8rem;width:100%}
+.nr .form-control,.nr .form-select,.nr .selectize-input{border:1px solid var(--app-border)!important;border-radius:.5rem;background:var(--bs-body-bg)!important;color:var(--bs-body-color);box-shadow:none}
+.nr input.form-control,.nr .form-select{min-height:2.65rem}
+.nr .selectize-input{min-height:2.65rem;display:flex;align-items:center;flex-wrap:wrap}
+.nr textarea.form-control{height:auto;resize:vertical}
+.nr .form-control:focus,.nr .form-select:focus,.nr .selectize-input.focus{border-color:var(--app-accent)!important;box-shadow:0 0 0 3px rgba(2,132,199,.15)!important}
+.nr .req-bad .control-label{color:#dc2626}
+.nr .req-bad .form-control,.nr .req-bad .form-select,.nr .req-bad .selectize-input{border-color:#dc2626!important;background:rgba(220,38,38,.05)!important;box-shadow:0 0 0 3px rgba(220,38,38,.12)!important}
+.form-intro{font-size:.85rem;color:var(--app-muted-fg);margin:-.2rem 0 1rem}
+.form-section-title{font-weight:650;font-size:.95rem;margin:.65rem 0 .8rem}
+.form-section-rule{border-top:1px solid var(--app-border);margin:.5rem 0 1rem}
+.action-bar{position:sticky;bottom:0;z-index:5;display:flex;align-items:center;justify-content:flex-end;gap:.65rem;padding:.9rem 0 .1rem;margin-top:.5rem;background:var(--bs-body-bg);border-top:1px solid var(--app-border)}
+.modal-content{border:1px solid var(--app-border);border-radius:.8rem;background:var(--bs-body-bg)}
+.modal-header,.modal-footer{border-color:var(--app-border)}
+.ref{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.8rem;word-break:break-word;color:var(--app-muted-fg)}
+.badge-scen{font-size:.9rem;background:var(--app-accent);color:#fff;padding:.2rem .5rem;border-radius:.4rem}
+.shiny-notification{opacity:1;border:1px solid #d4d4d8;border-radius:.6rem;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,.16);background:#f4f4f5!important;color:#27272a!important}
+.shiny-notification-message{background:#ecfdf5!important;color:#166534!important;border-color:#86efac!important}
+.shiny-notification-warning{background:#fffbeb!important;color:#92400e!important;border-color:#fcd34d!important}
+.shiny-notification-error{background:#fef2f2!important;color:#991b1b!important;border-color:#fca5a5!important}
+[data-bs-theme='dark'] .shiny-notification{background:#27272a!important;color:#f4f4f5!important;border-color:#52525b!important}
+[data-bs-theme='dark'] .shiny-notification-message{background:#052e16!important;color:#bbf7d0!important;border-color:#166534!important}
+[data-bs-theme='dark'] .shiny-notification-warning{background:#451a03!important;color:#fde68a!important;border-color:#92400e!important}
+[data-bs-theme='dark'] .shiny-notification-error{background:#450a0a!important;color:#fecaca!important;border-color:#991b1b!important}
+.shiny-notification-close{color:inherit!important}
+@media(min-width:1900px){.page-shell{max-width:1840px;padding-left:2.75rem;padding-right:2.75rem}.card-body{padding:1.3rem 1.4rem}}
+
+/* Final contrast/accessibility pass inspired by the reference dashboard. */
+body,.navbar{background:var(--app-bg)!important;color:var(--bs-body-color)!important}
+.page-heading p,.chart-note,.metric-label,.metric-note,.dt-foot,.fgrid .control-label{color:var(--app-muted-fg)!important}
+.card,.metric-card{background:var(--app-card-bg)!important;border:1px solid var(--app-border)!important;box-shadow:0 1px 2px rgba(0,0,0,.07)}
+.card-header{background:var(--app-card-bg)!important;border-bottom:1px solid var(--app-border)!important;color:var(--bs-body-color)!important}
+[data-bs-theme='dark'] .card,[data-bs-theme='dark'] .metric-card{box-shadow:0 0 0 1px rgba(212,212,216,.08),0 8px 22px rgba(0,0,0,.22)}
+.btn-outline-secondary{border-color:var(--app-border)!important;color:var(--bs-body-color)!important}
+.btn-outline-secondary:hover,.btn-outline-secondary:focus{border-color:var(--app-muted-fg)!important;background:var(--app-muted)!important;color:var(--bs-body-color)!important}
+[data-bs-theme='dark'] .btn-outline-secondary{border-color:#71717a!important;color:#fafafa!important}
+.form-control,.form-select,.selectize-input,.selectize-dropdown,.input-group-text{background:var(--app-input-bg)!important;color:var(--bs-body-color)!important;border-color:var(--app-border)!important}
+.form-control::placeholder,.selectize-input input::placeholder{color:var(--app-muted-fg)!important;opacity:1}
+.selectize-dropdown{border:1px solid var(--app-border)!important;box-shadow:0 8px 20px rgba(0,0,0,.14)!important}
+.selectize-dropdown .option{background:var(--app-card-bg)!important;color:var(--bs-body-color)!important}
+.selectize-dropdown .active{background:var(--app-muted)!important;color:var(--bs-body-color)!important}
+[data-bs-theme='dark'] .selectize-input input{color:#fafafa!important}
+[data-bs-theme='dark'] .form-control:focus,[data-bs-theme='dark'] .form-select:focus,[data-bs-theme='dark'] .selectize-input.focus{border-color:#38bdf8!important;box-shadow:0 0 0 3px rgba(56,189,248,.2)!important}
+.nav-tabs{border-bottom:1px solid var(--app-border)!important}
+.nav-tabs .nav-link{color:var(--app-muted-fg)!important;border:1px solid transparent!important}
+.nav-tabs .nav-link.active{color:var(--bs-body-color)!important;background:var(--app-muted)!important;border-color:var(--app-border) var(--app-border) var(--app-accent)!important}
+table.dataTable thead th{color:var(--bs-body-color)!important;border-bottom:2px solid var(--app-border)!important}
+table.dataTable tbody td{color:var(--bs-body-color)!important;border-bottom:1px solid var(--app-border)!important}
+table.dataTable tbody tr:nth-child(even)>td{background:var(--app-card-bg)!important}
+table.dataTable tbody tr:nth-child(odd)>td{background:var(--app-bg)!important}
+table.dataTable tbody tr:hover>td{background:var(--app-muted)!important}
+[data-bs-theme='dark'] table.dataTable tbody tr.selected>td{background:#164e63!important;color:#f0f9ff!important}
+[data-bs-theme='dark'] .dropdown-menu{background:#18181b!important;color:#fafafa!important;border-color:#52525b!important}
+[data-bs-theme='dark'] .dropdown-item{color:#f4f4f5!important}
+[data-bs-theme='dark'] .dropdown-item:hover{background:#27272a!important;color:#ffffff!important}
+[data-bs-theme='dark'] .text-muted,[data-bs-theme='dark'] .muted{color:#d4d4d8!important}
+.btn-primary,.btn-primary:hover,.btn-primary:focus,.btn-primary:active{color:#ffffff!important}
+
+"
+
+js <- "
+function setRangePlaceholders(){
+  $('#f_dates-start').attr('placeholder','Start date');
+  $('#f_dates-end').attr('placeholder','End date');
+}
+$(document).on('shiny:connected', setRangePlaceholders);
+$(document).on('shown.bs.dropdown', '.filter-dd', setRangePlaceholders);
+$(document).on('shiny:connected', function() {
+  Shiny.addCustomMessageHandler('mark', function(m) {
+    $('.req-bad').removeClass('req-bad');
+    (m.ids || []).forEach(function(id) {
+      $('#' + id).closest('.shiny-input-container').addClass('req-bad');
+    });
+  });
+  Shiny.addCustomMessageHandler('scrollbad', function(m) {
+    setTimeout(function() {
+      var el = $('.req-bad').first();
+      if (el.length) el[0].scrollIntoView({behavior: 'smooth', block: 'center'});
+    }, 80);
+  });
+  Shiny.addCustomMessageHandler('badge', function(m) {
+    $('#fcount').text(m.n).css('display', m.n > 0 ? 'inline-block' : 'none');
+  });
+});
+// a field counts as 'touched' once the user leaves it
+$(document).on('focusout', '.nr .shiny-input-container', function() {
+  var id = this.id || $(this).find('select,input,textarea').first().attr('id');
+  if (!id) return;
+  setTimeout(function() {
+    Shiny.setInputValue('touched', id, {priority: 'event'});
+  }, 300);
+});
+// keep the filter dropdown open while picking dates / options
+$(document).on('hide.bs.dropdown', '.filter-dd', function(e) {
+  var ce = e.clickEvent;
+  if (ce && $(ce.target).closest('.datepicker, .datepicker-dropdown, .selectize-dropdown').length)
+    e.preventDefault();
+});
+// copy button in the share dialog
+$(document).on('click', '#copy_link', function() {
+  var t = document.getElementById('share_url');
+  t.select();
+  if (navigator.clipboard) navigator.clipboard.writeText(t.value);
+  else document.execCommand('copy');
+  $(this).text('Copied');
+});
+"
+
+# first 5 words in the row; 'see more' opens the full text in a popup
+more_render <- function(title) JS(sub("TITLE", title, fixed = TRUE, r"---(
+function(data, type, row) {
+  if (type !== 'display' || data === null || data === undefined) return data;
+  var esc = function(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+                    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  };
+  var words = String(data).trim().split(/\s+/);
+  if (words.length <= 5) return esc(data);
+  return esc(words.slice(0,5).join(' ')) + '\u2026 <a href="#" class="dmore" ' +
+         'data-title="TITLE #' + row[0] + '" data-full="' + esc(data) +
+         '">see more</a>';
+}
+)---"))
+
+more_init <- JS(r"---(
+function(settings) {
+  $(this.api().table().node()).on('click', 'a.dmore', function(e) {
+    e.preventDefault(); e.stopPropagation();
+    Shiny.setInputValue('see_more',
+      {title: $(this).attr('data-title'), text: $(this).attr('data-full'),
+       nonce: Math.random()}, {priority: 'event'});
+  });
+}
+)---")
+
+dt_language <- list(
+  search = "", searchPlaceholder = "Search all columns...",
+  paginate = list(previous = "\u2190", `next` = "\u2192"),
+  emptyTable = "No requests yet", zeroRecords = "No matching requests")
+
+# =============================================================================
+# UI
+# =============================================================================
+ui <- function(request) {
+  page_navbar(
+    id = "nav", selected = "requests", fillable = FALSE,
+    title = tags$a(href = ".", class = "brand", "Expense Tracker"),
+    window_title = "Expense Tracker", theme = app_theme,
+    header = tagList(tags$style(css), tags$script(HTML(js))),
+    
+    nav_panel(
+      title = "Requests", value = "requests",
+      div(class = "page-shell",
+          div(class = "page-heading",
+              div(h1("Requests"), p("Track procurement requests and understand spending over time.")),
+              actionButton("new_request", tagList(icon("plus"), "New request"), class = "btn-primary")),
+          
+          div(class = "toolbar",
+              div(class = "dropdown filter-dd",
+                  tags$button(class = "btn btn-outline-secondary", type = "button",
+                              `data-bs-toggle` = "dropdown", `data-bs-auto-close` = "outside",
+                              `aria-expanded` = "false", icon("filter"), " Filters",
+                              span(id = "fcount", class = "badge rounded-pill text-bg-primary ms-2",
+                                   style = "display:none")),
+                  div(class = "dropdown-menu p-3 fmenu",
+                      div(class = "fgrid",
+                          div(class = "wide", dateRangeInput(
+                            "f_dates", "Date range", start = NULL, end = NULL,
+                            separator = " to ", format = "dd-mm-yyyy", width = "100%")),
+                          selectizeInput("f_week", "Week", NULL, multiple = TRUE,
+                                         options = list(placeholder = "All weeks")),
+                          selectizeInput("f_project", "Project code", NULL, multiple = TRUE,
+                                         options = list(placeholder = "All projects")),
+                          selectizeInput("f_person", "Requested by", NULL, multiple = TRUE,
+                                         options = list(placeholder = "All requesters")),
+                          selectizeInput("f_submitter", "Submitted by", NULL, multiple = TRUE,
+                                         options = list(placeholder = "All focal points")),
+                          div(class = "wide d-flex justify-content-end gap-2 mt-1",
+                              actionButton("reset", "Clear filters", class = "btn-outline-secondary btn-sm"))))),
+              div(class = "ms-auto d-flex align-items-center gap-2 flex-wrap",
+                  selectInput("cur", NULL, CUR, selected = "ETB", width = "110px"),
+                  actionButton("share", "Share view", icon = icon("link"), class = "btn-outline-secondary"))),
+          
+          uiOutput("totals"),
+          
+          card(class = "mt-3", card_header(div(class = "card-head",
+                                               span("Request breakdown"),
+                                               div(class = "d-flex align-items-end flex-wrap gap-2",
+                                                   selectInput("breakdown_status", "Status",
+                                                               choices = c("Paid" = "paid", "Waiting" = "waiting",
+                                                                           "Under validation" = "under validation", "Rejected" = "rejected"),
+                                                               selected = "paid", width = "190px"),
+                                                   selectInput("dim", "Group by", DIMS, selected = "project_code", width = "190px")))),
+               navset_tab(
+                 nav_panel("Chart", plotOutput("plot_dim", height = "300px")),
+                 nav_panel("Table", DTOutput("by_dim", fill = FALSE)))),
+          
+          card(class = "chart-card mt-3", card_header("Monthly request amounts by status"),
+               div(class = "card-body",
+                   p(class = "chart-note", "Compare paid, waiting and under-validation request values month by month."),
+                   plotOutput("plot_trend", height = "330px"))),
+          
+          
+          
+          card(class = "mt-3", fill = FALSE,
+               card_header(div(class = "table-head",
+                               div(span("Request register"), p(class = "chart-note mb-0", "Select a row, then open it to review or update its details.")),
+                               div(class = "buttons",
+                                   actionButton("open_request", "Open", icon = icon("folder-open"), class = "btn-outline-secondary"),
+                                   downloadButton("export", "Export", class = "btn-outline-secondary")))),
+               navset_tab(
+                 id = "request_status", selected = "all",
+                 nav_panel("All requests", value = "all", DTOutput("table_all", fill = FALSE)),
+                 nav_panel("Waiting", value = "waiting", DTOutput("table_waiting", fill = FALSE)),
+                 nav_panel("Under validation", value = "under validation", DTOutput("table_validation", fill = FALSE)),
+                 nav_panel("Paid", value = "paid", DTOutput("table_paid", fill = FALSE)),
+                 nav_panel("Rejected", value = "rejected", DTOutput("table_rejected", fill = FALSE))))
+      )
+    ),
+    # Full-page new request; the navbar link is hidden and navigation is controlled by buttons.
+    nav_panel(
+      title = "New request", value = "new",
+      div(class = "page-shell",
+          div(class = "page-heading",
+              div(h1("New request"),
+                  p("Enter a procurement request. Fields without an asterisk are optional.")),
+              actionButton("cancel_new", tagList(icon("arrow-left"), "Back to requests"),
+                           class = "btn-outline-secondary")),
+          layout_columns(
+            fill = FALSE, col_widths = c(8, 4),
+            card(fill = FALSE,
+                 div(class = "card-body",
+                     uiOutput("new_form_ui"),
+                     div(class = "action-bar",
+                         actionButton("clear", "Clear form", class = "btn-outline-secondary"),
+                         actionButton("cancel_new_bottom", "Cancel", class = "btn-outline-secondary"),
+                         actionButton("add", "Add request", class = "btn-primary")))),
+            card(card_header("Request preview"),
+                 div(class = "card-body", uiOutput("preview")))
+          ))
+    ),
+    nav_spacer(),
+    nav_item(input_dark_mode(id = "mode"))
+  )
+}
+
+# =============================================================================
+# SERVER
+# =============================================================================
 server <- function(input, output, session) {
-  editing <- reactiveVal(NULL)
-  errors <- reactiveVal(character())
-  alloc_keys <- reactiveVal(1L)
-  next_key <- reactiveVal(1L)
-  alloc_seed <- reactiveVal(data.frame(key = 1L, project_code = "", budget_line = "", amount_usd = NA_real_))
-  local_refresh <- reactiveVal(0L)
-  saving <- FALSE
-  form_saved <- FALSE
+  touched  <- reactiveVal(character())
+  show_all <- reactiveVal(FALSE)
+  edit_id  <- reactiveVal(NULL)
   
-  snapshot <- reactivePoll(1500, session,
-                           checkFunc = function() {
-                             cx <- connect_db(); on.exit(DBI::dbDisconnect(cx))
-                             DBI::dbGetQuery(cx, "SELECT revision FROM app_revision WHERE id=1")$revision[[1]]
-                           },
-                           valueFunc = read_dataset)
-  # Local refresh provides immediate feedback after this session saves.
-  dataset <- reactive({
-    local_refresh()
-    snapshot()
-    read_dataset()
-  })
-  requests <- reactive(dataset()$requests)
-  allocations <- reactive(dataset()$allocations)
+  # Clear Shiny's default date-range value on first render so the dashboard opens
+  # with the full database history rather than only the current date/month.
+  session$onFlushed(function() {
+    suppressWarnings(updateDateRangeInput(session, "f_dates", start = NA, end = NA))
+  }, once = TRUE)
   
-  observe({
-    d <- requests(); a <- allocations()
-    updateSelectInput(session, "f_project", choices = c("All projects" = "", sort(unique(a$project_code))),
-                      selected = isolate(input$f_project))
-    updateSelectInput(session, "f_location", choices = c("All locations" = "", sort(unique(d$location))),
-                      selected = isolate(input$f_location))
+  # ---- read live rows from the shared SQLite database ----
+  # Keep this connection open for PRAGMA data_version, which changes after commits
+  # by other connections (including other Shiny sessions and external writers).
+  poll_cn <- con()
+  session$onSessionEnded(function() {
+    if (DBI::dbIsValid(poll_cn)) DBI::dbDisconnect(poll_cn)
   })
-  observe({
-    a <- allocations()
-    if (nzchar(text(input$f_project))) a <- a[a$project_code == input$f_project, , drop = FALSE]
-    choices <- sort(unique(a$budget_line))
-    selected <- isolate(text(input$f_budget))
-    if (!selected %in% choices) selected <- ""
-    updateSelectInput(session, "f_budget", choices = c("All budget lines" = "", choices), selected = selected)
-  })
+  db_poll <- reactivePoll(
+    1000, session,
+    checkFunc = function() as.character(dbGetQuery(poll_cn, "PRAGMA data_version")[[1]][[1]]),
+    valueFunc = function() dbGetQuery(poll_cn, "SELECT * FROM expenses ORDER BY id DESC")
+  )
   
-  filtered <- reactive({
-    d <- requests(); a <- allocations()
-    if (nzchar(text(input$f_status))) d <- d[d$status == input$f_status, , drop = FALSE]
-    if (nzchar(text(input$f_location))) d <- d[d$location == input$f_location, , drop = FALSE]
-    if (date_ok(input$f_from)) d <- d[d$order_date >= as.character(input$f_from), , drop = FALSE]
-    if (date_ok(input$f_to)) d <- d[d$order_date <= as.character(input$f_to), , drop = FALSE]
-    if (nzchar(text(input$f_project))) a <- a[a$project_code == input$f_project, , drop = FALSE]
-    if (nzchar(text(input$f_budget))) a <- a[a$budget_line == input$f_budget, , drop = FALSE]
-    if (nzchar(text(input$f_project)) || nzchar(text(input$f_budget))) d <- d[d$id %in% a$po_id, , drop = FALSE]
-    q <- tolower(text(input$search))
-    if (nzchar(q) && nrow(d)) {
-      cols <- c("id", "description", "requested_by", "submitted_by", "order_form", "po_reference", "supplier", "location")
-      hay <- apply(d[, cols, drop = FALSE], 1, function(x) paste(x, collapse = " "))
-      d <- d[grepl(q, tolower(hay), fixed = TRUE), , drop = FALSE]
-    }
+  data <- reactive({
+    d <- db_poll()
+    # Backward compatibility for older rows saved with the status "cancelled".
+    if ("status" %in% names(d)) d$status[!is.na(d$status) & d$status == "cancelled"] <- "rejected"
+    # USD is fixed at entry, so scenario and totals don't move when RATES change.
+    # as.numeric() keeps this working when the table is still empty.
+    usd <- as.numeric(ifelse(is.na(d$usd),
+                             as.numeric(d$amount) / unname(RATES[d$currency]),
+                             d$usd))
+    for (k in CUR)
+      d[[k]] <- as.numeric(ifelse(d$currency %in% k, d$amount,
+                                  round(usd * RATES[[k]], 2)))
+    d$scenario      <- scenario(usd, d$waiver)
+    d$week          <- format(as.Date(d$order_date), "%G-W%V")
+    d$month         <- format(as.Date(d$order_date), "%Y-%m")
     d
   })
-  scoped_allocations <- reactive({
-    a <- allocations(); a <- a[a$po_id %in% filtered()$id, , drop = FALSE]
-    if (nzchar(text(input$f_project))) a <- a[a$project_code == input$f_project, , drop = FALSE]
-    if (nzchar(text(input$f_budget))) a <- a[a$budget_line == input$f_budget, , drop = FALSE]
-    a
-  })
-  observeEvent(input$clear_filters, {
-    updateTextInput(session, "search", value = "")
-    for (id in c("f_status", "f_project", "f_budget", "f_location")) updateSelectInput(session, id, selected = "")
-    updateDateInput(session, "f_from", value = NA)
-    updateDateInput(session, "f_to", value = NA)
-  })
   
-  output$metrics <- renderUI({
-    d <- filtered()
-    counts <- c("All POs" = nrow(d), "Waiting" = sum(d$status == "waiting"),
-                "Under validation" = sum(d$status == "under validation"),
-                "Paid" = sum(d$status == "paid"), "Cancelled" = sum(d$status == "cancelled"))
-    div(class = "metrics", lapply(names(counts), function(nm)
-      div(class = "metric", span(nm), strong(counts[[nm]]))))
-  })
-  output$row_count <- renderText(paste(nrow(filtered()), "matching POs. Amounts in the register are whole-PO totals; finance uses only matching allocation rows."))
-  output$register <- renderDT({
-    d <- filtered(); a <- allocations()
-    labels <- vapply(d$id, function(id) {
-      z <- a[a$po_id == id, , drop = FALSE]
-      paste(paste(z$project_code, z$budget_line, sep = " / "), collapse = "; ")
-    }, character(1))
-    stage <- vapply(d$status, function(s) {
-      cls <- paste0("stage-", gsub(" ", "-", s))
-      paste0('<span class="badge-stage ', cls, '">', stage_label(s), '</span>')
-    }, character(1))
-    view <- data.frame(ID = d$id, Description = d$description, Allocation = labels,
-                       USD = d$amount_usd, Stage = stage, Location = d$location,
-                       Focal = d$submitted_by, Date = d$order_date, check.names = FALSE)
-    datatable(view, rownames = FALSE, escape = setdiff(seq_len(ncol(view)), 5L),
-              selection = "single", options = list(dom = "tip", pageLength = 10,
-                                                   scrollX = TRUE, order = list(list(0, "desc")),
-                                                   language = list(emptyTable = "No POs match these filters."))) |>
-      formatRound("USD", 2)
-  }, server = FALSE)
-  
-  selected_record <- function() {
-    idx <- input$register_rows_selected
-    d <- isolate(filtered())
-    if (length(idx) != 1L || idx < 1L || idx > nrow(d)) {
-      showNotification("Select one PO in the register first.", type = "warning")
-      return(NULL)
-    }
-    d[idx, , drop = FALSE]
+  week_choices <- function(d) {
+    d <- d[!is.na(d$week), , drop = FALSE]
+    if (!nrow(d)) return(character())
+    s <- d |> group_by(week) |>
+      summarise(first = min(as.Date(order_date)), .groups = "drop") |>
+      arrange(desc(week))
+    mon <- s$first - (as.integer(format(s$first, "%u")) - 1L)
+    setNames(s$week, paste0(s$week, " (from ", format(mon, "%d %b"), ")"))
   }
   
-  # Allocation inputs preserve unsaved values when rows are added/removed.
-  collect_allocations <- function() {
-    keys <- isolate(alloc_keys()); seed <- isolate(alloc_seed())
-    rows <- lapply(keys, function(k) {
-      fallback <- seed[seed$key == k, , drop = FALSE]
-      get_value <- function(prefix, col, default) {
-        val <- isolate(input[[paste0(prefix, k)]])
-        if (!is.null(val)) return(val)
-        if (nrow(fallback)) return(fallback[[col]][[1]])
-        default
-      }
-      data.frame(key = k,
-                 project_code = text(get_value("ap_", "project_code", "")),
-                 budget_line = text(get_value("ab_", "budget_line", "")),
-                 amount_usd = num_or_na(get_value("aa_", "amount_usd", NA_real_)))
-    })
-    do.call(rbind, rows)
+  # dropdown values come from the database, not from this user's history
+  observe({
+    d <- data()
+    keep <- function(id) { x <- isolate(input[[id]]); if (is.null(x)) "" else x }
+    for (id in names(CACHE)) {
+      cur <- keep(id)
+      ch  <- union(cache_choices(d, id), cur[nzchar(cur)])
+      updateSelectizeInput(session, id, choices = c("", ch), selected = cur,
+                           options = list(create = TRUE, placeholder = "Type or pick"))
+    }
+    updateSelectizeInput(session, "f_project", choices = uniq(d$project_code),
+                         selected = isolate(input$f_project))
+    updateSelectizeInput(session, "f_person", choices = uniq(d$requested_by),
+                         selected = isolate(input$f_person))
+    updateSelectizeInput(session, "f_submitter", choices = uniq(d$submitted_by),
+                         selected = isolate(input$f_submitter))
+    updateSelectizeInput(session, "f_week", choices = week_choices(d),
+                         selected = isolate(input$f_week))
+  })
+  
+  # ---- filters: date range, week, project, requester and submitter ----
+  date_bound <- function(x) {
+    if (is.null(x) || !length(x) || is.na(x[[1]]) || !nzchar(trimws(as.character(x[[1]]))))
+      return(as.Date(NA))
+    suppressWarnings(as.Date(as.character(x[[1]])))
   }
-  output$allocation_inputs <- renderUI({
-    keys <- alloc_keys(); seed <- alloc_seed()
-    tagList(lapply(keys, function(k) {
-      row <- seed[seed$key == k, , drop = FALSE]
-      if (!nrow(row)) row <- data.frame(project_code = "", budget_line = "", amount_usd = NA_real_)
-      div(class = "alloc-row",
-          textInput(paste0("ap_", k), "Project code *", row$project_code[[1]]),
-          textInput(paste0("ab_", k), "Budget line *", row$budget_line[[1]]),
-          numericInput(paste0("aa_", k), "Allocation amount (USD) *", row$amount_usd[[1]], min = 0, step = 0.01))
-    }))
+  base <- reactive({
+    d <- data()
+    dr <- input$f_dates
+    from <- if (length(dr) >= 1) date_bound(dr[[1]]) else as.Date(NA)
+    to <- if (length(dr) >= 2) date_bound(dr[[2]]) else as.Date(NA)
+    if (!is.na(from)) d <- filter(d, !is.na(order_date), as.Date(order_date) >= from)
+    if (!is.na(to)) d <- filter(d, !is.na(order_date), as.Date(order_date) <= to)
+    if (length(input$f_week))      d <- filter(d, week %in% input$f_week)
+    if (length(input$f_project))   d <- filter(d, project_code %in% input$f_project)
+    if (length(input$f_person))    d <- filter(d, requested_by %in% input$f_person)
+    if (length(input$f_submitter)) d <- filter(d, submitted_by %in% input$f_submitter)
+    d
   })
-  observeEvent(input$add_allocation, {
-    a <- collect_allocations(); k <- next_key() + 1L; next_key(k)
-    alloc_seed(rbind(a, data.frame(key = k, project_code = "", budget_line = "", amount_usd = NA_real_)))
-    alloc_keys(c(alloc_keys(), k))
-  })
-  observeEvent(input$remove_allocation, {
-    if (length(alloc_keys()) <= 1L) return()
-    a <- collect_allocations(); keys <- head(alloc_keys(), -1L)
-    alloc_seed(a[a$key %in% keys, , drop = FALSE]); alloc_keys(keys)
-  })
-  output$allocation_total <- renderUI({
-    vals <- lapply(alloc_keys(), function(k) input[[paste0("aa_", k)]])
-    amounts <- vapply(vals, num_or_na, numeric(1))
-    if (anyNA(amounts)) return(p(class = "subtle", "Enter an amount for every allocation row."))
-    p(class = "subtle", paste("Allocated:", money(sum(amounts)), "USD | PO total:",
-                              if (number_ok(input$amount_usd)) money(input$amount_usd) else "not entered"))
+  filtered <- reactive(base())
+  
+  observeEvent(input$reset, {
+    suppressWarnings(updateDateRangeInput(session, "f_dates", start = NA, end = NA))
+    for (id in c("f_week", "f_project", "f_person", "f_submitter"))
+      updateSelectizeInput(session, id, selected = character(0))
   })
   
-  text_fields <- c("description", "requested_by", "submitted_by", "country", "location",
-                   "order_form", "po_reason", "po_reference", "supplier", "unit",
-                   "remarks", "program_remarks", "cancellation_reason")
-  date_fields <- c("order_date", "processing_date", "po_date", "finance_date", "payment_date", "rate_date")
-  numeric_fields <- c("quantity", "amount_usd", "rate_etb", "rate_eur", "rate_gbp")
-  select_fields <- c("department", "scenario", "waiver", "status")
+  # Filter count shown on the dropdown button.
+  observe({
+    dr <- input$f_dates
+    has_one_date <- length(dr) >= 1 && !is.na(date_bound(dr[[1]]))
+    has_two_dates <- length(dr) >= 2 && !is.na(date_bound(dr[[2]]))
+    n <- sum(has_one_date, has_two_dates, length(input$f_week) > 0,
+             length(input$f_project) > 0, length(input$f_person) > 0,
+             length(input$f_submitter) > 0)
+    session$sendCustomMessage("badge", list(n = n))
+  })
   
-  load_form <- function(row = NULL) {
-    form_saved <<- FALSE
-    errors(character())
-    editing(if (is.null(row)) NULL else list(id = row$id[[1]], version = row$version[[1]]))
-    for (id in text_fields) {
-      val <- if (is.null(row)) { if (id == "country") "ETH" else "" } else text(row[[id]][[1]])
-      if (id %in% c("description", "remarks", "program_remarks")) updateTextAreaInput(session, id, value = val)
-      else updateTextInput(session, id, value = val)
-    }
-    for (id in numeric_fields) updateNumericInput(session, id,
-                                                  value = if (is.null(row)) NA_real_ else row[[id]][[1]])
-    for (id in date_fields) {
-      val <- if (is.null(row)) { if (id == "order_date") Sys.Date() else as.Date(NA) }
-      else if (is.na(row[[id]][[1]]) || !nzchar(row[[id]][[1]])) as.Date(NA)
-      else as.Date(row[[id]][[1]])
-      updateDateInput(session, id, value = val)
-    }
-    defaults <- list(department = "", scenario = "", waiver = "No", status = "waiting")
-    for (id in select_fields) updateSelectInput(session, id,
-                                                selected = if (is.null(row)) defaults[[id]] else row[[id]][[1]])
-    updateSelectInput(session, "preview_currency", selected = "USD")
-    a <- if (is.null(row)) data.frame(project_code = "", budget_line = "", amount_usd = NA_real_)
-    else isolate(allocations())[isolate(allocations())$po_id == row$id[[1]], c("project_code", "budget_line", "amount_usd"), drop = FALSE]
-    if (!nrow(a)) a <- data.frame(project_code = "", budget_line = "", amount_usd = NA_real_)
-    # Fresh keys prevent stale browser input values being reused between POs.
-    keys <- seq.int(next_key() + 1L, length.out = nrow(a))
-    next_key(max(keys)); a$key <- keys
-    alloc_seed(a[, c("key", "project_code", "budget_line", "amount_usd")]); alloc_keys(keys)
-    nav_select("nav", "form", session = session)
+  # Short, shareable URL containing only the active filters.
+  share_url <- function() {
+    enc <- function(x) URLencode(paste(x, collapse = "|"), reserved = TRUE)
+    dr <- input$f_dates
+    q <- list(
+      v = "r",
+      f = if (length(dr) >= 1 && !is.na(date_bound(dr[[1]]))) as.character(date_bound(dr[[1]])) else NULL,
+      t = if (length(dr) >= 2 && !is.na(date_bound(dr[[2]]))) as.character(date_bound(dr[[2]])) else NULL,
+      w = if (length(input$f_week)) enc(input$f_week) else NULL,
+      p = if (length(input$f_project)) enc(input$f_project) else NULL,
+      r = if (length(input$f_person)) enc(input$f_person) else NULL,
+      s = if (length(input$f_submitter)) enc(input$f_submitter) else NULL
+    )
+    q <- Filter(Negate(is.null), q)
+    cd <- session$clientData
+    host <- paste0(cd$url_hostname,
+                   if (nzchar(cd$url_port %||% "")) paste0(":", cd$url_port))
+    paste0(cd$url_protocol, "//", host, cd$url_pathname, "?",
+           paste0(names(q), "=", unlist(q), collapse = "&"))
   }
-  observeEvent(input$new_po, load_form())
-  observeEvent(input$edit_po, { row <- selected_record(); if (!is.null(row)) load_form(row) })
-  observeEvent(input$back, nav_select("nav", "requests", session = session))
-  observeEvent(input$cancel_form, { errors(character()); nav_select("nav", "requests", session = session) })
-  output$form_title <- renderText(if (is.null(editing())) "Record new PO" else paste("Edit PO #", editing()$id))
-  output$form_errors <- renderUI({
-    if (!length(errors())) return(NULL)
-    div(class = "error-list", strong("Please correct the following:"), tags$ul(lapply(errors(), tags$li)))
-  })
-  output$currency_preview <- renderUI({
-    cur <- text(input$preview_currency)
-    if (!number_ok(input$amount_usd)) return(p(class = "subtle", "Enter the USD total first."))
-    rate <- if (cur == "USD") 1 else input[[paste0("rate_", tolower(cur))]]
-    if (!number_ok(rate) || rate <= 0) return(p(class = "subtle", paste("Enter", cur, "per USD to preview this conversion.")))
-    div(class = "notice", strong(paste(money(input$amount_usd * rate), cur)),
-        div(class = "subtle", paste("Original:", money(input$amount_usd), "USD")))
+  
+  observeEvent(input$share, {
+    showModal(modalDialog(
+      title = "Share this view",
+      p(class = "chart-note", "Anyone with the link can open this view with the same filters. No request data is embedded in the URL."),
+      div(class = "input-group",
+          tags$input(id = "share_url", class = "form-control", readonly = NA,
+                     value = share_url(), onclick = "this.select()"),
+          tags$button(id = "copy_link", type = "button", class = "btn btn-primary", "Copy link")),
+      footer = modalButton("Close"), easyClose = TRUE))
   })
   
-  observeEvent(input$suggest_scenario, {
-    if (!number_ok(input$amount_usd) || input$amount_usd <= 0) {
-      showNotification("Enter a positive USD total first.", type = "warning"); return()
+  observeEvent(session$clientData$url_search, {
+    q <- parseQueryString(session$clientData$url_search)
+    if (!length(q) || !identical(q[["v"]], "r")) return()
+    d <- isolate(data())
+    vals <- function(k) if (is.null(q[[k]]) || !nzchar(q[[k]])) character()
+    else strsplit(q[[k]], "|", fixed = TRUE)[[1]]
+    as_d <- function(x) tryCatch(as.Date(x), error = function(e) NA)
+    from <- if (!is.null(q[["f"]])) as_d(q[["f"]]) else NA
+    to <- if (!is.null(q[["t"]])) as_d(q[["t"]]) else NA
+    if (!is.na(from) || !is.na(to))
+      suppressWarnings(updateDateRangeInput(session, "f_dates",
+                                            start = if (is.na(from)) NA else from, end = if (is.na(to)) NA else to))
+    set <- function(id, key, choices) {
+      selected <- vals(key)
+      if (length(selected)) updateSelectizeInput(session, id,
+                                                 choices = with_sel(choices, selected), selected = selected)
     }
-    code <- if (identical(input$waiver, "Framework agreement")) "G" else
-      as.character(cut(input$amount_usd, breaks = c(-Inf, 500, 5000, 30000, 150000, Inf),
-                       labels = c("A", "B", "C", "D", "E"), right = FALSE))
-    updateSelectInput(session, "scenario", selected = code)
+    set("f_week", "w", week_choices(d))
+    set("f_project", "p", uniq(d$project_code))
+    set("f_person", "r", uniq(d$requested_by))
+    set("f_submitter", "s", uniq(d$submitted_by))
+  }, once = TRUE)
+  
+  # ---- New request is a full page, not a modal ----
+  observeEvent(input$new_request, {
+    touched(character()); show_all(FALSE)
+    nav_select("nav", "new", session = session)
   })
-  output$scenario_hint <- renderUI({
-    lead <- c(A = "less than 1 week", B = "about 2-3 weeks", C = "about 2-3 weeks",
-              D = "about 1.5 months", E = "about 2 months", G = "about 2 months")
-    code <- text(input$scenario)
-    if (!code %in% names(lead)) return(NULL)
-    p(class = "subtle", paste("Indicative lead time from the prototype:", lead[[code]],
-                              "(not a deadline or guarantee)."))
-  })
-  observeEvent(input$draft_refs, {
-    a <- collect_allocations()
-    if (any(!nzchar(a$project_code)) || any(!nzchar(a$budget_line)) ||
-        !date_ok(input$order_date) || !nzchar(text(input$country)) ||
-        !nzchar(text(input$location)) || !nzchar(text(input$department))) {
-      showNotification("Complete project, budget line, country, location, department and request date first.", type = "warning")
-      return()
-    }
-    # Multi-allocation references need explicit review rather than silently choosing one budget.
-    if (nrow(a) > 1L) {
-      showNotification("For a multi-budget PO, enter the actual external references manually.", type = "warning")
-      return()
-    }
-    parts <- c(toupper(a$project_code[[1]]), toupper(a$budget_line[[1]]),
-               text(input$country), text(input$location), text(input$department))
-    base <- paste(parts, collapse = "/")
-    if (!nzchar(text(input$order_form))) updateTextInput(session, "order_form",
-                                                         value = paste0("OF/", base, "/", format(input$order_date, "%d-%m-%Y")))
-    if (!nzchar(text(input$po_reference)) && nzchar(text(input$po_reason)) && date_ok(input$po_date))
-      updateTextInput(session, "po_reference", value = paste0("PO/OF/", base, "/",
-                                                              text(input$po_reason), "/", format(input$po_date, "%d-%m-%Y")))
-    showNotification("Drafted blank reference fields only. Check them against the actual documents.", type = "message")
+  observeEvent(input$cancel_new, nav_select("nav", "requests", session = session))
+  observeEvent(input$cancel_new_bottom, nav_select("nav", "requests", session = session))
+  
+  output$new_form_ui <- renderUI({
+    div(class = "nr",
+        div(class = "form-section-title", "Request details"),
+        div(class = "fg",
+            col(12, textAreaInput("description", R("Description"), rows = 2, width = "100%")),
+            col(4, cached("requested_by", "Requested by")),
+            col(4, cached("project_code", "Project code")),
+            col(4, cached("budget_line", "Budget line")),
+            col(4, pick("department", "Department", DEPTS)),
+            col(4, cached("location", "Location")),
+            col(4, cached("supplier", "Supplier")),
+            col(4, numericInput("amount", R("Amount"), NA, min = 0, width = "100%")),
+            col(4, pick("currency", "Currency", CUR))
+        ),
+        div(class = "form-section-rule"),
+        div(class = "form-section-title", "Optional details"),
+        div(class = "fg",
+            col(4, cached("country", "Country", req = FALSE)),
+            col(4, numericInput("quantity", "Quantity", NA, min = 0, width = "100%")),
+            col(4, cached("unit", "Unit", req = FALSE)),
+            col(4, div(style = "padding-top:1.9rem", checkboxInput("framework", "Framework agreement"))),
+            col(6, cached("submitted_by", "Submitted by (focal point)", req = FALSE)),
+            col(6, date_in("of_date", "Order date", Sys.Date(), width = "100%")),
+            col(12, textAreaInput("remarks", "Remarks", rows = 2, width = "100%"))
+        )
+    )
   })
   
-  observeEvent(input$save_po, {
-    if (saving) return()
-    if (form_saved) {
-      showNotification("This form was already saved. Use Record new PO or Edit selected to start again.", type = "warning")
+  # ---- new request: required fields (TRUE = filled) ----
+  valid <- reactive(c(
+    description  = nzchar(v(input$description)),
+    requested_by = nzchar(v(input$requested_by)),
+    supplier     = nzchar(v(input$supplier)),
+    project_code = nzchar(v(input$project_code)),
+    budget_line  = nzchar(v(input$budget_line)),
+    department   = nzchar(v(input$department)),
+    location     = nzchar(v(input$location)),
+    amount       = has_num(input$amount) && input$amount > 0,
+    currency     = nzchar(v(input$currency))
+  ))
+  
+  observeEvent(input$touched, touched(union(touched(), input$touched)))
+  
+  # red = required but empty (after leaving the field, or after pressing Add)
+  observe({
+    bad  <- names(valid())[!valid()]
+    show <- if (show_all()) bad else intersect(bad, touched())
+    session$sendCustomMessage("mark", list(ids = as.list(show)))
+  })
+  
+  waiver_val <- reactive(if (isTRUE(input$framework)) "Framework agreement" else "No")
+  odate <- reactive(if (has_date(input$of_date)) input$of_date else Sys.Date())
+  
+  form_rec <- reactive(list(
+    project_code = v(input$project_code), budget_line = v(input$budget_line),
+    country = v(input$country), location = v(input$location),
+    department = v(input$department), order_date = as.character(odate())))
+  
+  # picking a project suggests its department and location (still editable)
+  observeEvent(input$project_code, {
+    pc <- v(input$project_code); req(nzchar(pc))
+    p <- db_get("SELECT department, location FROM projects WHERE project_code = ?", pc)
+    if (!nrow(p)) return()
+    if (nzchar(v(p$department)))
+      updateSelectInput(session, "department", selected = p$department)
+    if (nzchar(v(p$location)))
+      updateSelectizeInput(session, "location",
+                           choices = c("", union(cache_choices(isolate(data()), "location"), p$location)),
+                           selected = p$location,
+                           options = list(create = TRUE, placeholder = "Type or pick"))
+  }, ignoreInit = TRUE)
+  
+  output$preview <- renderUI({
+    of  <- mk_ref(form_rec(), "OF")
+    cur <- v(input$currency); amt <- input$amount
+    shown <- function(x) if (is.na(x)) "\u2014" else x
+    top <- if (!nzchar(cur) || !has_num(amt)) {
+      p(class = "muted", "Enter amount and currency to see the scenario.")
+    } else {
+      usd <- amt / RATES[[cur]]
+      s   <- scenario(usd, waiver_val())
+      tagList(
+        p(span(paste("Scenario", s), class = "badge badge-scen"), " ",
+          span(SCEN_NAME[[s]], class = "muted")),
+        p(class = "mb-2", tags$b("Expected time: "), LEAD[[s]]),
+        tags$table(class = "table table-sm",
+                   lapply(CUR, function(k)
+                     tags$tr(tags$td(k, class = "muted"),
+                             tags$td(money(usd * RATES[[k]]), style = "text-align:right"))))
+      )
+    }
+    div(top,
+        p(class = "muted mb-0", "Order form"), p(shown(of), class = "ref"),
+        p(class = "muted mb-0", "Purchase order"),
+        p("Created when status moves to under validation", class = "ref muted"))
+  })
+  
+  # back to the starting values (defaults prefilled, the rest empty)
+  reset_form <- function() {
+    updateTextAreaInput(session, "description", value = "")
+    d <- isolate(data())
+    for (id in names(CACHE)) {
+      val <- DEFAULTS[[id]] %||% ""
+      ch  <- union(cache_choices(d, id), val[nzchar(val)])
+      updateSelectizeInput(session, id, choices = c("", ch), selected = val,
+                           options = list(create = TRUE, placeholder = "Type or pick"))
+    }
+    for (id in c("department", "currency"))
+      updateSelectInput(session, id, selected = DEFAULTS[[id]] %||% "")
+    updateCheckboxInput(session, "framework", value = FALSE)
+    for (id in c("amount", "quantity")) updateNumericInput(session, id, value = NA)
+    suppressWarnings(updateDateInput(session, "of_date", value = Sys.Date()))
+    updateTextAreaInput(session, "remarks", value = "")
+    touched(character()); show_all(FALSE)
+  }
+  observeEvent(input$clear, reset_form())
+  
+  observeEvent(input$add, {
+    if (!all(valid())) {      # button stays active: show what is missing instead
+      show_all(TRUE)
+      session$sendCustomMessage("scrollbad", list())
+      showNotification("Some required fields are empty.", type = "warning")
       return()
     }
-    saving <<- TRUE
-    on.exit({ saving <<- FALSE }, add = TRUE)
-    a <- collect_allocations(); issues <- character()
-    required_text <- c(description = "Description", requested_by = "Requested by",
-                       submitted_by = "Logistics focal point", country = "Country", location = "Location")
-    for (id in names(required_text)) if (!nzchar(text(input[[id]]))) issues <- c(issues, paste(required_text[[id]], "is required."))
-    if (!text(input$department) %in% DEPARTMENTS) issues <- c(issues, "Select a department.")
-    if (!text(input$status) %in% STAGES) issues <- c(issues, "Select a valid stage.")
-    if (!date_ok(input$order_date)) issues <- c(issues, "Request date is required.")
-    if (!number_ok(input$amount_usd) || input$amount_usd <= 0) issues <- c(issues, "PO amount must be greater than zero.")
-    if (number_ok(input$amount_usd) && abs(input$amount_usd - round(input$amount_usd, 2)) > 1e-7)
-      issues <- c(issues, "PO amount must have at most two decimal places.")
-    if (any(abs(a$amount_usd - round(a$amount_usd, 2)) > 1e-7, na.rm = TRUE))
-      issues <- c(issues, "Allocation amounts must have at most two decimal places.")
-    if (any(!nzchar(a$project_code)) || any(!nzchar(a$budget_line))) issues <- c(issues, "Every allocation needs a project code and budget line.")
-    if (anyNA(a$amount_usd) || any(!is.finite(a$amount_usd)) || any(a$amount_usd <= 0, na.rm = TRUE)) issues <- c(issues, "Every allocation amount must be greater than zero.")
-    if (number_ok(input$amount_usd) && !anyNA(a$amount_usd) &&
-        abs(sum(a$amount_usd) - input$amount_usd) > 0.005) issues <- c(issues, "Allocation amounts must equal the USD PO total.")
-    if (anyDuplicated(paste(toupper(a$project_code), toupper(a$budget_line), sep = "|"))) issues <- c(issues, "Combine duplicate project/budget-line rows into one allocation.")
-    if (number_ok(input$quantity) && input$quantity <= 0) issues <- c(issues, "Quantity must be positive when entered.")
-    for (id in c("rate_etb", "rate_eur", "rate_gbp")) {
-      val <- input[[id]]
-      if (!is.null(val) && length(val) && !is.na(val) && (!number_ok(val) || val <= 0)) issues <- c(issues, paste(id, "must be positive."))
-    }
-    any_rate <- any(vapply(c("rate_etb", "rate_eur", "rate_gbp"), function(id) number_ok(input[[id]]), logical(1)))
-    if (any_rate && !date_ok(input$rate_date)) issues <- c(issues, "Enter the exchange-rate date when supplying rates.")
-    if (identical(input$status, "paid") && !date_ok(input$payment_date)) issues <- c(issues, "Payment date is required for a paid PO.")
-    if (length(issues)) { errors(unique(issues)); showNotification("Please review the validation messages above the form.", type = "warning"); return() }
-    row <- lapply(text_fields, function(id) text(input[[id]])); names(row) <- text_fields
-    for (id in date_fields) row[[id]] <- iso_date(input[[id]])
-    for (id in numeric_fields) row[[id]] <- num_or_na(input[[id]])
-    for (id in select_fields) row[[id]] <- text(input[[id]])
-    row$payment_date <- if (input$status == "paid") iso_date(input$payment_date) else NA_character_
-    row$cancellation_reason <- if (input$status == "cancelled") text(input$cancellation_reason) else ""
-    row$batch <- BATCH; row$updated <- stamp()
-    current <- isolate(editing())
-    result <- tryCatch({
-      cx <- connect_db(); on.exit(DBI::dbDisconnect(cx), add = TRUE)
-      DBI::dbWithTransaction(cx, {
-        if (is.null(current)) {
-          row$created <- row$updated
-          DBI::dbExecute(cx, paste0("INSERT INTO po_requests (", paste(names(row), collapse = ","),
-                                    ") VALUES (", paste(rep("?", length(row)), collapse = ","), ")"), params = unname(row))
-          id <- DBI::dbGetQuery(cx, "SELECT last_insert_rowid() AS id")$id[[1]]
-        } else {
-          id <- current$id
-          changed <- DBI::dbExecute(cx, paste0("UPDATE po_requests SET ",
-                                               paste(paste0(names(row), "=?"), collapse = ","), ",version=version+1 WHERE id=? AND version=?"),
-                                    params = c(unname(row), list(id, current$version)))
-          if (changed != 1L) stop("This PO changed in another session. Reopen it from Requests before editing again.")
-          DBI::dbExecute(cx, "DELETE FROM po_allocations WHERE po_id=?", params = list(id))
-        }
-        for (i in seq_len(nrow(a))) DBI::dbExecute(cx,
-                                                   "INSERT INTO po_allocations (po_id,project_code,budget_line,amount_usd) VALUES (?,?,?,?)",
-                                                   params = list(id, toupper(a$project_code[[i]]), toupper(a$budget_line[[i]]), a$amount_usd[[i]]))
-        DBI::dbExecute(cx, "UPDATE app_revision SET revision=revision+1 WHERE id=1")
-        id
-      })
-    }, error = function(e) e)
-    if (inherits(result, "error")) {
-      errors(paste("Could not save:", conditionMessage(result)))
-      showNotification("PO was not saved. Your form is still available.", type = "error")
-      return()
-    }
-    form_saved <<- TRUE
-    errors(character()); editing(NULL); local_refresh(local_refresh() + 1L)
+    cur  <- input$currency
+    rate <- RATES[[cur]]
+    rec  <- form_rec()
+    row <- list(
+      description = v(input$description), project_code = rec$project_code,
+      budget_line = rec$budget_line, country = nz(input$country),
+      location = rec$location, department = rec$department,
+      reason = NA_character_, order_form = mk_ref(rec, "OF"), po = NA_character_,
+      requested_by = v(input$requested_by),
+      submitted_by = if (nzchar(v(input$submitted_by))) v(input$submitted_by)
+      else DEFAULTS$submitted_by,
+      status = "waiting", waiver = waiver_val(), supplier = v(input$supplier),
+      unit = nz(input$unit),
+      quantity = if (has_num(input$quantity)) input$quantity else NA_real_,
+      amount = input$amount, currency = cur,
+      usd = input$amount / rate, rate_used = rate,
+      order_date = rec$order_date, po_date = NA_character_,
+      payment_date = NA_character_, remarks = nz(input$remarks),
+      created = now(), updated = now())
+    cn <- con(); on.exit(dbDisconnect(cn))
+    dbExecute(cn, sprintf("INSERT INTO expenses(%s) VALUES(%s)",
+                          paste(names(row), collapse = ","),
+                          paste(rep("?", length(row)), collapse = ",")),
+              params = unname(row))
+    # remember this project's department and location for next time
+    dbExecute(cn, "INSERT OR REPLACE INTO projects(project_code, department, location)
+                   VALUES(?,?,?)",
+              params = list(row$project_code, row$department, row$location))
+    reset_form()
     nav_select("nav", "requests", session = session)
-    showNotification(paste("PO #", result, "saved."), type = "message")
+    showNotification("Request added.", type = "message")
   })
   
-  observeEvent(input$open_po, {
-    row <- selected_record(); if (is.null(row)) return()
-    a <- allocations(); a <- a[a$po_id == row$id[[1]], , drop = FALSE]
-    showModal(modalDialog(title = paste("PO #", row$id[[1]], "-", stage_label(row$status[[1]])), size = "l",
-                          div(class = "detail-grid",
-                              field("Description", row$description), field("Original amount (USD)", money(row$amount_usd)),
-                              field("Requester", row$requested_by), field("Logistics focal point", row$submitted_by),
-                              field("Department", row$department), field("Country / location", paste(row$country, row$location, sep = " / ")),
-                              field("Request date", row$order_date), field("Processing date", row$processing_date),
-                              field("Order form reference", row$order_form), field("PO / contract reference", row$po_reference),
-                              field("Supplier", row$supplier), field("Quantity / unit", paste(ifelse(is.na(row$quantity), "", row$quantity), row$unit)),
-                              field("Scenario", row$scenario), field("Memo / waiver", row$waiver),
-                              field("PO reason", row$po_reason), field("PO date", row$po_date),
-                              field("Submitted to finance", row$finance_date), field("Payment date", row$payment_date),
-                              field("Cancellation reason", row$cancellation_reason), field("Batch", row$batch),
-                              field("Logistics remarks", row$remarks), field("Program remarks", row$program_remarks),
-                              field("ETB per USD", row$rate_etb), field("EUR per USD", row$rate_eur),
-                              field("GBP per USD", row$rate_gbp), field("Rate date", row$rate_date),
-                              field("Created (UTC)", row$created), field("Updated (UTC)", row$updated)),
-                          tags$hr(), h3("Budget allocations (USD)"),
-                          tags$table(class = "table table-sm",
-                                     tags$thead(tags$tr(tags$th("Project"), tags$th("Budget line"), tags$th("USD"))),
-                                     tags$tbody(lapply(seq_len(nrow(a)), function(i) tags$tr(tags$td(a$project_code[i]),
-                                                                                             tags$td(a$budget_line[i]), tags$td(money(a$amount_usd[i])))))),
-                          footer = modalButton("Close"), easyClose = TRUE))
-  })
-  
-  finance_rows <- reactive({
-    a <- scoped_allocations(); d <- filtered()
-    if (!nrow(a)) return(data.frame(project_code = character(), budget_line = character(),
-                                    currency = character(), waiting = numeric(), under_validation = numeric(), paid = numeric(),
-                                    cancelled = numeric(), missing_rates = integer()))
-    z <- merge(a, d[, c("id", "status", "rate_etb", "rate_eur", "rate_gbp"), drop = FALSE],
-               by.x = "po_id", by.y = "id", all.x = TRUE)
-    cur <- text(input$report_currency); if (!cur %in% CURRENCIES) cur <- "USD"
-    rate <- if (cur == "USD") rep(1, nrow(z)) else z[[paste0("rate_", tolower(cur))]]
-    z$value <- z$amount_usd * rate
-    z$missing <- is.na(z$value)
-    # A missing conversion makes the affected stage total NA, never a misleading partial sum.
-    z |>
-      group_by(project_code, budget_line) |>
-      summarise(currency = cur,
-                waiting = sum(value[status == "waiting"]),
-                under_validation = sum(value[status == "under validation"]),
-                paid = sum(value[status == "paid"]),
-                cancelled = sum(value[status == "cancelled"]),
-                missing_rates = sum(missing), .groups = "drop") |>
-      arrange(project_code, budget_line)
-  })
-  output$conversion_warning <- renderUI({
-    f <- finance_rows()
-    if (nrow(f) && any(f$missing_rates > 0)) div(class = "notice",
-                                                 "Some matching allocations have no saved rate for this currency. Affected totals are blank, not zero. Use USD or edit those POs to supply the rate.")
-  })
-  output$finance_table <- renderDT({
-    datatable(finance_rows(), rownames = FALSE, selection = "none",
-              colnames = c("Project", "Budget line", "Currency", "Waiting", "Under validation",
-                           "Paid - for finance", "Cancelled - excluded", "Allocations missing rates"),
-              options = list(dom = "tip", pageLength = 20, scrollX = TRUE)) |>
-      formatRound(c("waiting", "under_validation", "paid", "cancelled"), 2)
-  }, server = FALSE)
-  
-  workbook <- function(file) {
-    d <- filtered(); a <- scoped_allocations(); f <- finance_rows()
-    # Separate allocation sheet avoids duplicating whole-PO totals across budget lines.
-    paid <- a[a$po_id %in% d$id[d$status == "paid"], , drop = FALSE]
-    paid <- merge(paid, d[, c("id", "payment_date"), drop = FALSE], by.x = "po_id", by.y = "id", all.x = TRUE)
-    meta <- data.frame(item = c("Generated UTC", "Batch", "Report type", "Request-date from", "Request-date to",
-                                "Project filter", "Budget-line filter", "Stage filter", "Location filter", "Search", "Summary currency", "Important"),
-                       value = c(stamp(), BATCH, "Current-stage snapshot; not incremental deductions",
-                                 if (date_ok(input$f_from)) as.character(input$f_from) else "All",
-                                 if (date_ok(input$f_to)) as.character(input$f_to) else "All",
-                                 text(input$f_project), text(input$f_budget), text(input$f_status), text(input$f_location),
-                                 text(input$search), text(input$report_currency),
-                                 "PO sheet contains whole-PO USD totals. Allocations and paid-for-finance sheets contain matching allocation USD amounts. No budget balances are calculated."))
-    writexl::write_xlsx(list(POs = d, Allocations_USD = a, Summary = f,
-                             Paid_for_finance_USD = paid, Report_notes = meta), path = file)
+  # ---- Open a selected request in a detailed, editable modal ----
+  requests_for_tab <- function(tab = input$request_status %||% "all") {
+    d <- filtered()
+    if (!identical(tab, "all")) d <- d[d$status == tab, , drop = FALSE]
+    d
   }
+  selected_request_id <- function() {
+    tab <- input$request_status %||% "all"
+    selected_input <- switch(tab,
+                             all = input$table_all_rows_selected,
+                             waiting = input$table_waiting_rows_selected,
+                             `under validation` = input$table_validation_rows_selected,
+                             paid = input$table_paid_rows_selected,
+                             rejected = input$table_rejected_rows_selected,
+                             NULL
+    )
+    d <- requests_for_tab(tab)
+    if (!length(selected_input) || selected_input[[1]] < 1 || selected_input[[1]] > nrow(d))
+      return(NULL)
+    as.integer(d$id[selected_input[[1]]])
+  }
+  
+  observeEvent(input$open_request, {
+    id <- selected_request_id()
+    if (is.null(id)) {
+      showNotification("Select a request row first.", type = "warning")
+      return()
+    }
+    r <- data()[data()$id == id, , drop = FALSE]
+    if (!nrow(r)) {
+      showNotification("That request is no longer available. Refresh the table and try again.", type = "warning")
+      return()
+    }
+    r <- r[1, , drop = FALSE]
+    edit_id(id)
+    showModal(modalDialog(
+      title = paste0("Request #", r$id), size = "l", easyClose = TRUE,
+      div(class = "form-intro", "Fields marked * are required. Country, quantity, unit, framework agreement, order date, submitted by and remarks are optional."),
+      div(class = "nr",
+          div(class = "form-section-title", "Request details"),
+          div(class = "fg",
+              col(12, textAreaInput("m_desc", "Description *", v(r$description), rows = 2, width = "100%")),
+              col(6, textInput("m_requested_by", "Requested by *", v(r$requested_by), width = "100%")),
+              col(6, textInput("m_submitted_by", "Submitted by", v(r$submitted_by), width = "100%")),
+              col(4, textInput("m_project", "Project code *", v(r$project_code), width = "100%")),
+              col(4, textInput("m_budget", "Budget line *", v(r$budget_line), width = "100%")),
+              col(4, selectInput("m_dept", "Department *", unique(c(DEPTS, v(r$department))), selected = v(r$department), width = "100%")),
+              col(4, textInput("m_loc", "Location *", v(r$location), width = "100%")),
+              col(4, textInput("m_country", "Country", v(r$country), width = "100%")),
+              col(4, textInput("m_supplier", "Supplier *", v(r$supplier), width = "100%")),
+              col(4, numericInput("m_amount", "Amount *", r$amount, min = 0, width = "100%")),
+              col(4, selectInput("m_cur", "Currency *", CUR, selected = r$currency, width = "100%")),
+              col(4, numericInput("m_quantity", "Quantity", if (is.na(r$quantity)) NA else r$quantity, min = 0, width = "100%")),
+              col(4, textInput("m_unit", "Unit", v(r$unit), width = "100%")),
+              col(4, div(style = "padding-top:1.9rem", checkboxInput("m_framework", "Framework agreement", value = identical(v(r$waiver), "Framework agreement")))),
+              col(4, selectInput("m_status", "Status *", STATUS, selected = v(r$status), width = "100%")),
+              col(8, textAreaInput("m_remarks", "Remarks", v(r$remarks), rows = 2, width = "100%")),
+              col(6, date_in("m_order_date", "Order date", if (is.na(r$order_date)) Sys.Date() else as.Date(r$order_date), width = "100%")),
+              col(6, conditionalPanel(
+                "input.m_status == 'under validation' || input.m_status == 'paid'",
+                div(class = "fg",
+                    col(6, selectizeInput("m_reason", "PO reason *",
+                                          choices = c("", uniq(c(data()$reason, r$reason))),
+                                          selected = v(r$reason), width = "100%",
+                                          options = list(create = TRUE, placeholder = "Type or pick"))),
+                    col(6, date_in("m_po_date", "PO date *",
+                                   if (is.na(r$po_date)) Sys.Date() else as.Date(r$po_date), width = "100%"))))),
+              col(6, conditionalPanel(
+                "input.m_status == 'paid'",
+                date_in("m_date", "Payment date *",
+                        if (is.na(r$payment_date)) Sys.Date() else as.Date(r$payment_date), width = "100%")))
+          )
+      ),
+      footer = tagList(modalButton("Cancel"), actionButton("m_save", "Save changes", class = "btn-primary"))
+    ))
+  })
+  
+  observeEvent(input$m_save, {
+    id <- edit_id()
+    old <- data()[data()$id == id, , drop = FALSE]
+    if (!nrow(old)) { removeModal(); return() }
+    old <- old[1, , drop = FALSE]
+    need_po <- input$m_status %in% c("under validation", "paid")
+    ok <- all(nzchar(c(v(input$m_desc), v(input$m_requested_by), v(input$m_project),
+                       v(input$m_budget), v(input$m_dept), v(input$m_loc), v(input$m_supplier)))) &&
+      has_num(input$m_amount) && input$m_amount > 0 && nzchar(v(input$m_cur)) &&
+      (!need_po || (nzchar(v(input$m_reason)) && has_date(input$m_po_date))) &&
+      (input$m_status != "paid" || has_date(input$m_date))
+    if (!ok) {
+      showNotification("Please complete the required fields before saving.", type = "warning")
+      return()
+    }
+    
+    changed <- !isTRUE(all.equal(input$m_amount, old$amount)) || input$m_cur != old$currency
+    rate <- if (changed || is.na(old$rate_used)) RATES[[input$m_cur]] else old$rate_used
+    usd <- if (changed || is.na(old$usd)) input$m_amount / rate else old$usd
+    order_date <- if (has_date(input$m_order_date)) as.character(input$m_order_date) else as.character(old$order_date)
+    reason <- if (need_po) v(input$m_reason) else v(old$reason)
+    po_date <- if (need_po) as.character(input$m_po_date) else as.character(old$po_date)
+    rec <- list(project_code = v(input$m_project), budget_line = v(input$m_budget),
+                country = v(input$m_country), location = v(input$m_loc),
+                department = v(input$m_dept), order_date = order_date,
+                reason = reason, po_date = po_date)
+    row <- list(
+      description = v(input$m_desc), project_code = rec$project_code,
+      budget_line = rec$budget_line, country = nz(input$m_country),
+      location = rec$location, department = rec$department,
+      supplier = v(input$m_supplier), requested_by = v(input$m_requested_by),
+      submitted_by = if (nzchar(v(input$m_submitted_by))) v(input$m_submitted_by) else DEFAULTS$submitted_by,
+      quantity = if (has_num(input$m_quantity)) input$m_quantity else NA_real_,
+      unit = nz(input$m_unit), remarks = nz(input$m_remarks),
+      waiver = if (isTRUE(input$m_framework)) "Framework agreement" else "No",
+      amount = input$m_amount, currency = input$m_cur, usd = usd, rate_used = rate,
+      status = input$m_status,
+      reason = if (nzchar(reason)) reason else NA_character_,
+      order_date = order_date,
+      po_date = if (need_po) as.character(input$m_po_date) else NA_character_,
+      order_form = mk_ref(rec, "OF"),
+      po = if (need_po) mk_ref(rec, "PO") else NA_character_,
+      payment_date = if (input$m_status == "paid") as.character(input$m_date) else NA_character_,
+      updated = now()
+    )
+    cn <- con(); on.exit(dbDisconnect(cn))
+    dbExecute(cn, sprintf("UPDATE expenses SET %s WHERE id=?",
+                          paste0(names(row), "=?", collapse = ",")),
+              params = c(unname(row), list(as.integer(id))))
+    dbExecute(cn, "INSERT OR REPLACE INTO projects(project_code, department, location) VALUES(?,?,?)",
+              params = list(row$project_code, row$department, row$location))
+    removeModal()
+    status_notice <- switch(input$m_status,
+                            waiting = list(text = "Request status set to Waiting.", type = "default"),
+                            `under validation` = list(text = "Request moved to Under validation.", type = "warning"),
+                            paid = list(text = "Request marked as Paid.", type = "message"),
+                            rejected = list(text = "Request rejected.", type = "error"),
+                            list(text = "Request updated.", type = "message"))
+    showNotification(status_notice$text, type = status_notice$type)
+  })
+  
+  # popup with the full description / remarks
+  observeEvent(input$see_more, {
+    showModal(modalDialog(
+      title = input$see_more$title,
+      div(style = "white-space:pre-wrap", input$see_more$text),
+      footer = modalButton("Close"), easyClose = TRUE))
+  })
+  
+  # ---- dashboard summary ----
+  output$totals <- renderUI({
+    d <- filtered(); k <- input$cur %||% "ETB"
+    total <- sum(d[[k]], na.rm = TRUE)
+    paid <- sum(d[[k]][d$status == "paid"], na.rm = TRUE)
+    waiting <- sum(d[[k]][d$status == "waiting"], na.rm = TRUE)
+    validation <- sum(d[[k]][d$status == "under validation"], na.rm = TRUE)
+    metric <- function(label, value, note) div(class = "metric-card",
+                                               p(class = "metric-label", label),
+                                               p(class = "metric-value", paste(k, abbr(value))),
+                                               p(class = "metric-note", note))
+    rejected <- sum(d[[k]][d$status == "rejected"], na.rm = TRUE)
+    div(class = "metrics-grid",
+        metric("Total requested", total, paste(nrow(d), "requests in the selected view")),
+        metric("Paid spend", paid, paste(sum(d$status == "paid", na.rm = TRUE), "paid requests")),
+        metric("Waiting", waiting, paste(sum(d$status == "waiting", na.rm = TRUE), "requests awaiting review")),
+        metric("Under validation", validation, paste(sum(d$status == "under validation", na.rm = TRUE), "requests in validation")),
+        metric("Rejected", rejected, paste(sum(d$status == "rejected", na.rm = TRUE), "rejected requests")))
+  })
+  
+  
+  # Status palette is consistent across charts, notifications and status changes.
+  fg_col <- function() if (identical(input$mode, "dark")) "#e4e4e7" else "#27272a"
+  status_label <- function(status) switch(status,
+                                          waiting = "Waiting",
+                                          `under validation` = "Under validation",
+                                          paid = "Paid",
+                                          rejected = "Rejected",
+                                          status)
+  
+  chart_theme <- function(fg)
+    theme_minimal(base_size = 12, base_family = "Inter") +
+    theme(text = element_text(colour = fg), axis.text = element_text(colour = fg),
+          axis.title = element_blank(),
+          panel.grid.major.y = element_blank(), panel.grid.minor = element_blank(),
+          panel.grid.major.x = element_line(colour = scales::alpha(fg, 0.16)),
+          plot.background = element_rect(fill = "transparent", colour = NA),
+          panel.background = element_rect(fill = "transparent", colour = NA),
+          legend.position = "bottom", legend.title = element_blank(),
+          plot.margin = margin(10, 18, 5, 5))
+  
+  # One monthly stacked chart compares paid, waiting and under-validation amounts.
+  output$plot_trend <- renderPlot({
+    chart_statuses <- c("waiting", "under validation", "paid")
+    d <- filtered() |> filter(status %in% chart_statuses, !is.na(month))
+    k <- input$cur %||% "ETB"
+    fg <- fg_col()
+    validate(need(nrow(d) > 0, "No paid, waiting or under-validation requests in this view"))
+    
+    g <- d |>
+      group_by(month, status) |>
+      summarise(total = sum(.data[[k]], na.rm = TRUE), .groups = "drop")
+    month_levels <- tail(sort(unique(g$month)), 12)
+    g <- filter(g, month %in% month_levels)
+    g$month <- factor(g$month, levels = month_levels)
+    g$status <- factor(g$status, levels = chart_statuses)
+    label_data <- g |> group_by(month) |> summarise(total = sum(total), .groups = "drop")
+    
+    ggplot(g, aes(x = month, y = total, fill = status)) +
+      geom_col(width = .68, position = "stack") +
+      geom_text(data = label_data, aes(x = month, y = total, label = abbr(total)),
+                inherit.aes = FALSE, vjust = -.45, colour = fg, size = 3.5) +
+      scale_fill_manual(values = STATUS_COL[chart_statuses],
+                        breaks = chart_statuses,
+                        labels = c("Waiting", "Under validation", "Paid"),
+                        drop = FALSE) +
+      scale_y_continuous(labels = abbr, expand = expansion(mult = c(0, .16))) +
+      labs(subtitle = paste("Monthly request values in", k), x = NULL, y = NULL) +
+      chart_theme(fg)
+  }, bg = "transparent", res = 96)
+  
+  # Breakdown can switch between all four statuses and group by project, requester or department.
+  totals_by <- function(key, status_value = input$breakdown_status %||% "paid") {
+    if (is.null(status_value) || !status_value %in% STATUS) status_value <- "paid"
+    filtered() |>
+      filter(.data$status == status_value) |>
+      group_by(label = coalesce(as.character(.data[[key]]), "(none)")) |>
+      summarise(requests = n(), across(all_of(CUR), ~ sum(.x, na.rm = TRUE)), .groups = "drop")
+  }
+  
+  output$plot_dim <- renderPlot({
+    status_value <- input$breakdown_status %||% "paid"
+    group_by_value <- input$dim %||% "project_code"
+    g <- totals_by(group_by_value, status_value)
+    validate(need(nrow(g) > 0, paste("No", status_label(status_value), "requests in this view")))
+    currency <- input$cur %||% "ETB"
+    g$total <- as.numeric(g[[currency]])
+    g$total[is.na(g$total)] <- 0
+    fg <- fg_col()
+    
+    # Department is more readable as a share-of-spend pie than a ranked bar chart.
+    if (identical(group_by_value, "department")) {
+      g <- g |> filter(total > 0) |> arrange(desc(total))
+      validate(need(nrow(g) > 0, paste("No positive", tolower(status_label(status_value)), "spend by department in", currency)))
+      g$share <- g$total / sum(g$total)
+      g$label <- ifelse(is.na(g$label) | !nzchar(g$label), "(none)", as.character(g$label))
+      g$pie_label <- paste0(abbr(g$total), "\n", round(g$share * 100), "%")
+      pie_cols <- c("#0284c7", "#0369a1", "#075985", "#0ea5e9", "#38bdf8", "#7dd3fc")
+      pie_values <- setNames(rep(pie_cols, length.out = nrow(g)), g$label)
+      
+      return(
+        ggplot(g, aes(x = "", y = total, fill = label)) +
+          geom_col(width = 1, colour = if (identical(input$mode, "dark")) "#18181b" else "#ffffff",
+                   linewidth = .8) +
+          coord_polar(theta = "y") +
+          geom_text(aes(label = pie_label), position = position_stack(vjust = .5),
+                    colour = "white", fontface = "bold", size = 3.6, lineheight = .95) +
+          scale_fill_manual(values = pie_values, name = "Department") +
+          labs(subtitle = paste("Department share of", tolower(status_label(status_value)),
+                                "spend in", currency), x = NULL, y = NULL) +
+          chart_theme(fg) +
+          theme(axis.text = element_blank(), axis.ticks = element_blank(),
+                panel.grid = element_blank(), axis.title = element_blank(),
+                legend.position = "right", plot.margin = margin(8, 12, 8, 8))
+      )
+    }
+    
+    g <- head(arrange(g, desc(total)), 10)
+    g$label <- factor(g$label, levels = rev(g$label))
+    ggplot(g, aes(x = label, y = total)) +
+      geom_col(fill = STATUS_COL[[status_value]], width = .62) +
+      geom_text(aes(label = abbr(total)), hjust = -.15, colour = fg, size = 3.4) +
+      coord_flip(clip = "off") +
+      scale_y_continuous(labels = abbr, expand = expansion(mult = c(0, .3))) +
+      labs(subtitle = paste("Top 10", tolower(status_label(status_value)), "requests in", currency),
+           x = NULL, y = NULL) + chart_theme(fg)
+  }, bg = "transparent", res = 96)
+  
+  output$by_dim <- renderDT({
+    status_value <- input$breakdown_status %||% "paid"
+    lab <- names(DIMS)[DIMS == input$dim]
+    datatable(totals_by(input$dim, status_value), rownames = FALSE, selection = "none",
+              fillContainer = FALSE, colnames = c(lab, "Requests", CUR),
+              options = list(dom = "t", language = dt_language, scrollX = TRUE)) |>
+      formatRound(CUR, 2)
+  })
+  
+  # ---- request list: exactly the six requested columns, no column filters ----
+  SHOW <- c("description", "project_code", "budget_line", "requested_by", "amount", "status")
+  render_request_table <- function(tab = "all") {
+    renderDT({
+      d <- requests_for_tab(tab)
+      display <- data.frame(
+        id = d$id,
+        description = ifelse(is.na(d$description), "", as.character(d$description)),
+        project_code = ifelse(is.na(d$project_code), "", as.character(d$project_code)),
+        budget_line = ifelse(is.na(d$budget_line), "", as.character(d$budget_line)),
+        requested_by = ifelse(is.na(d$requested_by), "", as.character(d$requested_by)),
+        amount = ifelse(is.na(d$amount), "", paste0(d$currency, " ", vapply(d$amount, money, character(1)))),
+        status = ifelse(is.na(d$status), "", as.character(d$status)),
+        check.names = FALSE
+      )
+      names(display) <- c("id", "Description", "Project code", "Budget line", "Requested by", "Amount", "Status")
+      datatable(display, rownames = FALSE, selection = "single", filter = "none",
+                fillContainer = FALSE, escape = TRUE,
+                options = list(
+                  scrollX = TRUE, autoWidth = TRUE, pageLength = 8,
+                  dom = "<'dt-top'f>rt<'dt-foot'ip>",
+                  language = dt_language, initComplete = more_init,
+                  columnDefs = list(
+                    list(targets = 0, visible = FALSE, searchable = FALSE),
+                    list(targets = 1, width = "32%", render = more_render("Description")),
+                    list(targets = c(2, 3, 4, 5, 6), className = "dt-body-left")
+                  )
+                ))
+    }, server = TRUE)
+  }
+  output$table_all <- render_request_table("all")
+  output$table_waiting <- render_request_table("waiting")
+  output$table_validation <- render_request_table("under validation")
+  output$table_paid <- render_request_table("paid")
+  output$table_rejected <- render_request_table("rejected")
+  
   output$export <- downloadHandler(
-    filename = function() paste0("PO_tracker_", Sys.Date(), ".xlsx"), content = workbook)
-  output$finance_export <- downloadHandler(
-    filename = function() paste0("Finance_snapshot_", Sys.Date(), ".xlsx"), content = workbook)
+    filename = "expenses.xlsx",
+    content  = function(file) write_xlsx(select(filtered(), -any_of(c("week", "month"))), file)
+  )
 }
 
 shinyApp(ui, server)
