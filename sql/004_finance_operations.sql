@@ -1,0 +1,8 @@
+-- STRUCTURAL PLACEHOLDER - NOT IMPLEMENTED
+-- File: sql/004_finance_operations.sql
+-- Owner: Friend; integrator reviews
+-- Purpose: Implement exact budget-level prepare/apply/abandon operations.
+-- Expected code: Allowlisted functions with sorted budget locks, frozen membership/line totals, sealing and correct release semantics.
+-- Connections: Called by finance_repo; depends on 001/002 and immutable payments.
+-- Boundary: No line-level selection/checkpoints, no timestamp sweep, no releasing applied items, no silent partial success across selected budgets.
+-- Read docs/PRODUCT_SPECIFICATION.md, docs/DATABASE_DESIGN.md and docs/FILE_STRUCTURE.md before implementation.

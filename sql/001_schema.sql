@@ -1,0 +1,8 @@
+-- STRUCTURAL PLACEHOLDER - NOT IMPLEMENTED
+-- File: sql/001_schema.sql
+-- Owner: Integrator
+-- Purpose: Create all 19 tables, primary/foreign/composite keys, ordinary checks and indexes.
+-- Expected code: Versioned DDL for the approved dictionary, including partial unique reservation/membership indexes.
+-- Connections: Read by migrate.R; must match DATABASE_DESIGN.md.
+-- Boundary: No sample records, credentials, DROP/recreate-on-startup or mutable budget balances. First migration metadata table is bootstrapped safely by migration runner.
+-- Read docs/PRODUCT_SPECIFICATION.md, docs/DATABASE_DESIGN.md and docs/FILE_STRUCTURE.md before implementation.

@@ -1,0 +1,8 @@
+-- STRUCTURAL PLACEHOLDER - NOT IMPLEMENTED
+-- File: sql/005_notification_operations.sql
+-- Owner: Friend; integrator reviews
+-- Purpose: Implement safe worker queue/claim/finalize operations.
+-- Expected code: Allowlisted functions for run/delivery idempotency, leases and outcome transitions.
+-- Connections: Called by notifications_repo; no dependence on request/finance operations.
+-- Boundary: No provider calls in SQL. Separate worker grants. Permission provisioning occurs explicitly after function creation, not through committed passwords.
+-- Read docs/PRODUCT_SPECIFICATION.md, docs/DATABASE_DESIGN.md and docs/FILE_STRUCTURE.md before implementation.
