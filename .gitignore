@@ -1,7 +1,61 @@
+<<<<<<< HEAD
 *.db
 .Rproj.user
 .Rproj
+=======
+# Environment and secrets
+>>>>>>> 46df1a52aa40976879d44a40e1e7964b5d18a824
 .Renviron
+.Renviron.*
+
+# R session files
 .Rhistory
 .RData
+<<<<<<< HEAD
 *.sqlite
+=======
+.Ruserdata
+
+# RStudio
+.Rproj.user/
+.Rproj
+
+# renv
+renv/library/
+renv/staging/
+renv/cache/
+
+# Databases
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+tracker.db*
+*.dump
+
+# Logs
+*.log
+
+# Exported/generated files
+exports/
+test-artifacts/
+
+# Deployment files
+rsconnect/
+
+# Operating System files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+*~
+
+# Quarto (if ever used)
+.quarto/
+
+# Python cache (harmless to ignore if not used)
+__pycache__/
+*.pyc
+>>>>>>> 46df1a52aa40976879d44a40e1e7964b5d18a824

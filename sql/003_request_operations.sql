@@ -1,0 +1,8 @@
+-- STRUCTURAL PLACEHOLDER - NOT IMPLEMENTED
+-- File: sql/003_request_operations.sql
+-- Owner: Dagim; integrator reviews
+-- Purpose: Implement atomic request writes and reference allocation.
+-- Expected code: Allowlisted PostgreSQL functions for create/edit/approve/cancel/mark-paid, idempotency, version checks, NUMERIC valuation, audit and revision.
+-- Connections: Called by requests_repo; depends on schema/integrity.
+-- Boundary: One transaction per business action. Preserve request->budget lock order. Never execute CBE HTTP in SQL or inside transaction.
+-- Read docs/PRODUCT_SPECIFICATION.md, docs/DATABASE_DESIGN.md and docs/FILE_STRUCTURE.md before implementation.

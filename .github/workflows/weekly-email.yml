@@ -1,0 +1,67 @@
+
+name: Weekly Email Notification
+
+on:
+  schedule:
+    # Every Friday at 13:00 Addis Ababa time (10:00 UTC)
+    - cron: '0 10 * * 5'
+
+  workflow_dispatch:
+
+jobs:
+  send-email:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Send notification emails
+        env:
+          EMAIL_USER: ${{ secrets.EMAIL_USER }}
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+        run: |
+          while IFS= read -r EMAIL
+          do
+            python3 - "$EMAIL" <<'EOF'
+          import os
+          import sys
+          import smtplib
+          import ssl
+          from email.message import EmailMessage
+
+          recipient = sys.argv[1]
+
+          msg = EmailMessage()
+          msg["Subject"] = "Weekly Procurement Report Ready"
+          msg["From"] = os.environ["EMAIL_USER"]
+          msg["To"] = recipient
+
+          msg.set_content("""
+          Hello,
+
+          The weekly procurement report is ready.
+
+          Open the application here:
+
+          https://teams.microsoft.com/l/message/19:5626f98d-dcc4-4e97-b77e-34cf78fcadc1_ac2d9871-ca25-4baf-b554-349898050b85@unq.gbl.spaces/1793196579763?context=%7B%22contextType%22%3A%22chat%22%7D
+          Regards,
+          Procurement Tracker
+          """)
+
+          context = ssl.create_default_context()
+
+          with smtplib.SMTP_SSL(
+              "smtp.gmail.com",
+              465,
+              context=context
+          ) as server:
+              server.login(
+                  os.environ["EMAIL_USER"],
+                  os.environ["EMAIL_PASSWORD"]
+              )
+              server.send_message(msg)
+
+          print(f"Email sent to {recipient}")
+          EOF
+          done < emails.txt
