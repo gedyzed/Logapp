@@ -10,3 +10,4 @@ url: https://connect.posit.cloud/gedionzeyede/content/01a163ff-923d-8bae-2ea6-aa
 version: 1
 asMultiple: FALSE
 asStatic: FALSE
+ignoredFiles: .Renviron.example|AGENTS.md|docs|tests
