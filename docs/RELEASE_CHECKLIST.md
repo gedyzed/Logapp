@@ -1,0 +1,58 @@
+# Release evidence checklist
+
+All entries start NOT RUN. Record environment, tester, date, command/evidence and issue. Do not treat scaffold tests as executed.
+
+- [ ] T01: Empty database: all four tabs, dropdowns and exports render without disconnecting. Status: NOT RUN.
+- [ ] T02: Idempotent seed: rerun inserts no duplicates and does not switch app behavior/database. Status: NOT RUN.
+- [ ] T03: Create: one valid request -> Under review, one reference, one initial state event. Status: NOT RUN.
+- [ ] T04: Validation: missing required/negative/nonfinite/excess-decimal amount rejected; values retained. Status: NOT RUN.
+- [ ] T05: Optional dates remain NULL; display format does not corrupt ISO storage. Status: NOT RUN.
+- [ ] T06: Budget/line dependency enforced in UI and server; forged mismatch rejected. Status: NOT RUN.
+- [ ] T07: Double Save/retry creates one request. Status: NOT RUN.
+- [ ] T08: Approval requires supplier/reason/date/confirmation and creates one PO/Pending event. Status: NOT RUN.
+- [ ] T09: Approval does not change finance totals. Status: NOT RUN.
+- [ ] T10: Cancellation preserves references/history and creates no payment. Status: NOT RUN.
+- [ ] T11: Paid creates one immutable payment event atomically and locks the request. Status: NOT RUN.
+- [ ] T12: Double Paid creates no duplicate event; stale edit/transition rejected. Status: NOT RUN.
+- [ ] T13: Reference collisions under concurrent requests follow approved suffix rule. Status: NOT RUN.
+- [ ] T14: Calendar This week is Monday-Sunday; newest ordering deterministic; export covers all matching pages. Status: NOT RUN.
+- [ ] T15: Theme switch/shared refresh preserves unsaved form values. Status: NOT RUN.
+- [ ] T16: Friday boundary: just before cutoff belongs to closing period; exactly at cutoff belongs to next. Status: NOT RUN.
+- [ ] T17: Reporting Friday-Friday and filter Monday-Sunday give intentionally different memberships. Status: NOT RUN.
+- [ ] T18: Backdated submission entered after cutoff appears in next registration-based report. Status: NOT RUN.
+- [ ] T19: Weekly report includes all states and ignores sidebar state/budget filters. Status: NOT RUN.
+- [ ] T20: Email link opens the correct Requests report period; no fifth tab. Status: NOT RUN.
+- [ ] T21: Worker reads active recipients from PostgreSQL; removed recipients suppressed before send. Status: NOT RUN.
+- [ ] T22: Same period/recipient is not routinely requeued/sent on repeated scheduler runs. Status: NOT RUN.
+- [ ] T23: Missing credentials -> Not configured, no false Sent result. Status: NOT RUN.
+- [ ] T24: Provider failure/timeout/crash -> accurate failed/uncertain status; no claimed exactly-once SMTP guarantee. Status: NOT RUN.
+- [ ] T25: Worker does not generate a report attachment or modify procurement/finance data. Status: NOT RUN.
+- [ ] T26: Zero-request week displays correctly and may still notify. Status: NOT RUN.
+- [ ] T27: All active budgets visible; Only budgets needing update filters correctly. Status: NOT RUN.
+- [ ] T28: Only budget checkboxes; nonzero lines auto-included; zero lines omitted from export. Status: NOT RUN.
+- [ ] T29: No line checkpoint timestamp; budget checkpoint context shared across lines. Status: NOT RUN.
+- [ ] T30: Draft freezes membership/totals; budget disabled for any second draft. Status: NOT RUN.
+- [ ] T31: Concurrent overlapping selections cannot reserve the same budget or event. Status: NOT RUN.
+- [ ] T32: New payment during draft shown separately and excluded from existing export. Status: NOT RUN.
+- [ ] T33: Changed preview requires reconfirmation; no silently changed batch amount. Status: NOT RUN.
+- [ ] T34: Apply requires checkbox, optional note; exact events acknowledged once. Status: NOT RUN.
+- [ ] T35: Applying releases budget for next batch but leaves new events unapplied. Status: NOT RUN.
+- [ ] T36: Abandon releases reservations, retains history and allows re-batching once. Status: NOT RUN.
+- [ ] T37: Applied batches cannot be edited/abandoned/deleted. Status: NOT RUN.
+- [ ] T38: Backdated payment recorded later remains unapplied regardless of checkpoint time. Status: NOT RUN.
+- [ ] T39: Simple Excel has only nonzero line deductions, correct USD/date/reference and reconciled totals. Status: NOT RUN.
+- [ ] T40: Tiny USD valuations accumulate before line rounding; no silent loss. Status: NOT RUN.
+- [ ] T41: Paid historical spending unchanged by checkpoint application or rate refresh. Status: NOT RUN.
+- [ ] T42: CBE parser: documented object/array forms, missing currency, bad/future date, nonpositive rates. Status: NOT RUN.
+- [ ] T43: FX outage does not disconnect app; original request can save under approved policy; Paid blocked clearly if required valuation unavailable. Status: NOT RUN.
+- [ ] T44: Frozen payment/batch valuations do not change after new rate fetch. Status: NOT RUN.
+- [ ] T45: Pending age excludes Under review; stops on Paid/cancellation; note edit does not reset it. Status: NOT RUN.
+- [ ] T46: No overdue labels before threshold configured; correct boundary afterward. Status: NOT RUN.
+- [ ] T47: Chart-specific filters do not leak between charts; date basis labelled. Status: NOT RUN.
+- [ ] T48: Light/dark, keyboard focus, long references, narrow screens and error states checked. Status: NOT RUN.
+- [ ] T49: Hosted create/restart/redeploy preserves PostgreSQL records and batch history. Status: NOT RUN.
+- [ ] T50: Two browser sessions see committed changes and reject stale writes. Status: NOT RUN.
+- [ ] T51: Worker DB role cannot write requests/payments/checkpoints; secrets absent from bundle/logs. Status: NOT RUN.
+- [ ] T52: Backup restored to isolated database and record/payment/batch totals reconcile. Status: NOT RUN.
+- [ ] T53: A committed batch is sealed; direct insertion of later budget/line/item membership is rejected. Status: NOT RUN.
+- [ ] T54: Raw payment totals reconcile with unapplied/applied raw values; saved batch rounding deltas explain any cent difference from exported totals. Status: NOT RUN.

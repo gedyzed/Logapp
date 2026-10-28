@@ -1,13 +1,51 @@
-*.db
-.Rproj.user
-
-tracker.db*
-
-
-.Rproj.user
-.Rproj
-
+# Environment and secrets
 .Renviron
+.Renviron.*
+
+# R session files
 .Rhistory
 .RData
-.sqlite
+.Ruserdata
+
+# RStudio
+.Rproj.user/
+.Rproj
+
+# renv
+renv/library/
+renv/staging/
+renv/cache/
+
+# Databases
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+tracker.db*
+*.dump
+
+# Logs
+*.log
+
+# Exported/generated files
+exports/
+test-artifacts/
+
+# Deployment files
+rsconnect/
+
+# Operating System files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+*~
+
+# Quarto (if ever used)
+.quarto/
+
+# Python cache (harmless to ignore if not used)
+__pycache__/
+*.pyc

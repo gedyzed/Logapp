@@ -1,0 +1,8 @@
+-- STRUCTURAL PLACEHOLDER - NOT IMPLEMENTED
+-- File: sql/002_integrity.sql
+-- Owner: Integrator
+-- Purpose: Install cross-row consistency and immutability protections.
+-- Expected code: Trigger functions/deferred constraint triggers for state/payment consistency, complete rates, sealed batches, sums and immutable history.
+-- Connections: Depends on 001; protects all repositories and operation functions.
+-- Boundary: CHECK constraints cannot replace cross-row enforcement. Validators must not introduce reverse lock order. No committed unsealed batch.
+-- Read docs/PRODUCT_SPECIFICATION.md, docs/DATABASE_DESIGN.md and docs/FILE_STRUCTURE.md before implementation.
