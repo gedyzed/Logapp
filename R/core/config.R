@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Check dependencies up front so the R console reports actionable startup errors.
 required_packages <- c("shiny", "bslib", "DBI", "RSQLite", "DT", "dplyr",
                        "writexl", "ggplot2", "scales")
@@ -127,13 +126,4 @@ scenario <- function(usd, waiver) {
                            labels = c("A", "B", "C", "D", "E"), right = FALSE))
   as.character(ifelse(waiver %in% "Framework agreement", "G", base))
 }
-=======
-# STRUCTURAL PLACEHOLDER - NOT IMPLEMENTED
-# File: R/core/config.R
-# Owner: Integrator
-# Purpose: Read and validate environment configuration and nonsecret app_settings.
-# Expected code: Configuration parsing, required-variable checks, constants and schema-version expectation.
-# Connections: Used by bootstrap, db, periods, FX and notification service. Database settings are read through db.R; credentials come only from environment/secrets.
-# Boundary: One canonical currency/state list. Separate app/worker/migration/test credentials. Do not require email secrets to launch the app. No hidden demo/live switch.
-# Read docs/PRODUCT_SPECIFICATION.md, docs/DATABASE_DESIGN.md and docs/FILE_STRUCTURE.md before implementation.
->>>>>>> 46df1a52aa40976879d44a40e1e7964b5d18a824
+

@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Financial Updates page. Mounted by requests_page.R. Server outputs register
 # only when this file is sourced inside a Shiny session.
 #
@@ -622,13 +621,4 @@ if (exists("input", inherits = FALSE) && exists("output", inherits = FALSE)) {
     })
   })
 }
-=======
-# STRUCTURAL PLACEHOLDER - NOT IMPLEMENTED
-# File: R/features/finance_page.R
-# Owner: Friend
-# Purpose: Implement Financial Updates UI.
-# Expected code: Namespaced module: budget cards, nested line rows, selection, preview modal, current batch cards, apply/abandon dialogs and history.
-# Connections: Calls finance_service and finance_export; uses components and refresh callback.
-# Boundary: Budget checkboxes only; no line checkpoint date. USD batch currency. No financial SQL or calculation in render functions.
-# Read docs/PRODUCT_SPECIFICATION.md, docs/DATABASE_DESIGN.md and docs/FILE_STRUCTURE.md before implementation.
->>>>>>> 46df1a52aa40976879d44a40e1e7964b5d18a824
+

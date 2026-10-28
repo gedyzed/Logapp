@@ -1,6 +1,5 @@
-<<<<<<< HEAD
-# =============================================================================
-ui <- function(request) {
+
+# =============================================================================ui <- function(request) {
   page_navbar(
     id = "nav", selected = "requests", fillable = FALSE,
     title = tags$a(href = ".", class = "brand brand-lockup",
@@ -361,16 +360,6 @@ ui <- function(request) {
     nav_item(actionButton("settings_open", NULL, icon = icon("gear"),
                           class = "nav-icon-btn", title = "Manage", `aria-label` = "Manage"))
   )
-}
 # =============================================================================
 # SERVER
-=======
-# STRUCTURAL PLACEHOLDER - NOT IMPLEMENTED
-# File: R/features/requests_page.R
-# Owner: Dagim
-# Purpose: Implement Requests tab layout and reactive behavior.
-# Expected code: Namespaced UI/server module: state cards, compact filters, newest-first table, pagination, export handler and modal launch.
-# Connections: Calls requests_service, requests_modals, weekly_report, requests_export and shared components; returns refresh/action signals to app shell.
-# Boundary: No direct SQL or lifecycle writes. State-card counts exclude selected-state filter. Table remains immediately below cards.
-# Read docs/PRODUCT_SPECIFICATION.md, docs/DATABASE_DESIGN.md and docs/FILE_STRUCTURE.md before implementation.
->>>>>>> 46df1a52aa40976879d44a40e1e7964b5d18a824
+

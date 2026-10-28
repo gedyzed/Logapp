@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Financial Update calculations and writes. The page UI lives in finance_page.R.
 # Select paid projects, batch them once, then move that batch from Active to
 # Applied (deduction confirmed) or Rejected (returned to the list).
@@ -469,13 +468,4 @@ observeEvent(input$fin_btn_confirm_proceed, {
   fin_history_tab("applied")
   showNotification(paste("Batch", code, "applied. The deduction is recorded."), type = "message")
 }, ignoreInit = TRUE)
-=======
-# STRUCTURAL PLACEHOLDER - NOT IMPLEMENTED
-# File: R/features/finance_service.R
-# Owner: Friend
-# Purpose: Own budget-level checkpoint workflow and finance view models.
-# Expected code: Budget/line summaries, eligibility, server-held preview tokens, prepare/apply/abandon orchestration and exact batch/history retrieval.
-# Connections: Calls finance_repo and contracts; receives clock/settings; returns frozen export view model.
-# Boundary: No request transitions or external workbook writes. Preview changed -> reconfirm. One draft per budget. Do not release applied payment membership.
-# Read docs/PRODUCT_SPECIFICATION.md, docs/DATABASE_DESIGN.md and docs/FILE_STRUCTURE.md before implementation.
->>>>>>> 46df1a52aa40976879d44a40e1e7964b5d18a824
+
