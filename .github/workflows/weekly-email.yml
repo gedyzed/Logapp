@@ -1,0 +1,70 @@
+name: Weekly Email
+
+on:
+  schedule:
+    - cron: '0 10 * * 5'
+
+  workflow_dispatch:
+
+jobs:
+  send_email:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Send emails
+        run: |
+
+          while IFS= read -r EMAIL
+          do
+
+          python - <<EOF
+
+from email.message import EmailMessage
+import smtplib
+import ssl
+import os
+
+msg = EmailMessage()
+
+msg["Subject"] = "Weekly Procurement Report"
+msg["From"] = os.environ["EMAIL_USER"]
+msg["To"] = "$EMAIL"
+
+msg.set_content("""
+
+Hello,
+
+Your weekly procurement report is ready.
+
+Open:
+https://your-app-link.com
+
+Regards
+Procurement Tracker
+
+""")
+
+ctx = ssl.create_default_context()
+
+with smtplib.SMTP_SSL(
+    "smtp.gmail.com",
+    465,
+    context=ctx
+) as server:
+
+    server.login(
+        os.environ["EMAIL_USER"],
+        os.environ["EMAIL_PASSWORD"]
+    )
+
+    server.send_message(msg)
+
+EOF
+
+          done < emails.txt
+
+        env:
+          EMAIL_USER: ${{ secrets.EMAIL_USER }}
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
