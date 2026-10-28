@@ -6,3 +6,4 @@
 # Connections: Called by requests_page; calls periods, requests_service weekly query and requests_export.
 # Boundary: Not a fifth tab, no stored report attachment, no email sending. Membership uses the approved reporting timestamp; sidebar filters do not leak into it.
 # Read docs/PRODUCT_SPECIFICATION.md, docs/DATABASE_DESIGN.md and docs/FILE_STRUCTURE.md before implementation.
+

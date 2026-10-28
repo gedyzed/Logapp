@@ -1,0 +1,13 @@
+name: expense_tracker
+title: expense_tracker
+username: gedionzeyede
+account: gedionzeyede
+server: connect.posit.cloud
+hostUrl: https://api.connect.posit.cloud/v1
+appId: 01a163ff-923d-8bae-2ea6-aabf9bb7ff3e
+bundleId:
+url: https://connect.posit.cloud/gedionzeyede/content/01a163ff-923d-8bae-2ea6-aabf9bb7ff3e
+version: 1
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: .Renviron.example|AGENTS.md|docs|tests

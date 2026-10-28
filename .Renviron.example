@@ -1,3 +1,7 @@
+<<<<<<< HEAD
+# Copy to .Renviron and fill in locally. Do not commit secrets.
+TRACKER_DB_PATH=
+=======
 # Names/placeholders only. Do not put real credentials here.
 # Each process reads its own credential group; the app does not require email auth.
 APP_DB_HOST=
@@ -36,3 +40,4 @@ EMAIL_SMTP_USER=
 EMAIL_SMTP_PASSWORD=
 EMAIL_API_KEY=
 # Provider implementation chooses SMTP/OAuth/API configuration; do not require all.
+>>>>>>> 46df1a52aa40976879d44a40e1e7964b5d18a824

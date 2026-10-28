@@ -1,10 +1,19 @@
+<<<<<<< HEAD
+*.db
+.Rproj.user
+.Rproj
+=======
 # Environment and secrets
+>>>>>>> 46df1a52aa40976879d44a40e1e7964b5d18a824
 .Renviron
 .Renviron.*
 
 # R session files
 .Rhistory
 .RData
+<<<<<<< HEAD
+*.sqlite
+=======
 .Ruserdata
 
 # RStudio
@@ -49,3 +58,4 @@ Thumbs.db
 # Python cache (harmless to ignore if not used)
 __pycache__/
 *.pyc
+>>>>>>> 46df1a52aa40976879d44a40e1e7964b5d18a824
