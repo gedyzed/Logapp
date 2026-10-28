@@ -1,7 +1,6 @@
 *.db
 .Rproj.user
 .Rproj
-
 .Renviron
 .Rhistory
 .RData
