@@ -215,18 +215,21 @@ fin_require_active <- function(code) {
   batch
 }
 
-fin_reserved_projects <- reactive({
+fin_reserved_ids <- reactive({
   batches <- fin_active_batches()
-  if (!nrow(batches)) return(character())
-  unique(fin_split_codes(paste(as.character(batches$project_codes), collapse = "|")))
+  if (!nrow(batches)) return(integer())
+  ids <- unique(unlist(batches$request_id_list, use.names = FALSE))
+  ids <- suppressWarnings(as.integer(ids))
+  ids[!is.na(ids)]
 })
 
-# Paid lines that are not already inside an active batch.
+# Paid lines that are not already inside an active batch. A later paid request
+# on the same project still appears, so it can be batched on its own.
 fin_pool <- reactive({
   d <- fin_base()
-  reserved <- fin_reserved_projects()
+  reserved <- fin_reserved_ids()
   if (length(reserved) && nrow(d)) {
-    d <- d[!fin_project_code(d$project_code) %in% reserved, , drop = FALSE]
+    d <- d[!d$id %in% reserved, , drop = FALSE]
   }
   d
 })
