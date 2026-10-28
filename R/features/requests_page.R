@@ -1,5 +1,5 @@
-
-# =============================================================================ui <- function(request) {
+# =============================================================================
+ui <- function(request) {
   page_navbar(
     id = "nav", selected = "requests", fillable = FALSE,
     title = tags$a(href = ".", class = "brand brand-lockup",
@@ -360,6 +360,6 @@
     nav_item(actionButton("settings_open", NULL, icon = icon("gear"),
                           class = "nav-icon-btn", title = "Manage", `aria-label` = "Manage"))
   )
+}
 # =============================================================================
 # SERVER
-
