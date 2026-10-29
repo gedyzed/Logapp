@@ -84,11 +84,12 @@ body{background:var(--app-bg);color:var(--bs-body-color);font-size:.92rem;font-w
 .fgrid .shiny-input-container{width:100%;margin:.15rem 0 .65rem}
 .fgrid .control-label{font-size:.78rem;font-weight:600;color:var(--app-muted-fg)}
 @media(max-width:620px){.fgrid{grid-template-columns:1fr}.fgrid .wide{grid-column:auto}}
-.btn-primary{--bs-btn-bg:#140C64;--bs-btn-border-color:#140C64;--bs-btn-hover-bg:#0e0848;--bs-btn-hover-border-color:#0e0848;--bs-btn-active-bg:#0a0636;font-weight:600;color:#fff!important}
-.btn-primary:hover,.btn-primary:focus,.btn-primary:active,.btn-primary:disabled,[data-bs-theme='dark'] .btn-primary{color:#fff!important}
-[data-bs-theme='dark'] .btn-primary{--bs-btn-bg:#140C64;--bs-btn-border-color:#140C64;--bs-btn-hover-bg:#2a1d86;--bs-btn-hover-border-color:#2a1d86}
-.btn-outline-secondary{border-color:var(--app-border);color:var(--bs-body-color);font-weight:500}
-.btn-outline-secondary:hover{background:var(--app-muted);border-color:var(--app-border);color:var(--bs-body-color)}
+.btn-primary{--bs-btn-bg:#0284C7;--bs-btn-border-color:#0284C7;--bs-btn-hover-bg:#0369a1;--bs-btn-hover-border-color:#0369a1;--bs-btn-active-bg:#0284C7;background-color:#0284C7!important;border-color:#0284C7!important;font-weight:600;color:#fff!important;border-radius:.55rem}
+.btn-primary:hover{background-color:#0369a1!important;border-color:#0369a1!important;color:#fff!important}
+.btn-primary:focus,.btn-primary:active,.btn-primary:disabled,[data-bs-theme='dark'] .btn-primary{background-color:#0284C7!important;border-color:#0284C7!important;color:#fff!important}
+[data-bs-theme='dark'] .btn-primary{--bs-btn-bg:#0284C7;--bs-btn-border-color:#0284C7;--bs-btn-hover-bg:#0369a1;--bs-btn-hover-border-color:#0369a1}
+.btn-outline-secondary{border:1px solid var(--app-border)!important;color:var(--bs-body-color)!important;font-weight:500;border-radius:.55rem;background:transparent!important}
+.btn-outline-secondary:hover,.btn-outline-secondary:focus{background:var(--app-muted)!important;border-color:var(--app-muted-fg)!important;color:var(--bs-body-color)!important}
 .card{border:1px solid var(--app-border);border-radius:var(--app-radius);box-shadow:none;background:var(--bs-card-bg,var(--bs-body-bg));min-width:0}
 .card-header{padding:1rem 1.15rem;background:transparent;border-bottom:1px solid var(--app-border);font-weight:600}
 .card-body{padding:1.1rem 1.15rem}
@@ -428,6 +429,7 @@ body.bslib-page-navbar .tab-pane.active{flex:1 1 auto;display:flex;flex-directio
 .request-table-card .html-widget-output,.request-table-card .datatables{flex:1 1 auto!important;display:flex!important;flex-direction:column!important;min-height:0}
 .request-table-card .dataTables_wrapper{flex:1 1 auto!important;min-height:100%}
 .card .dt-foot{margin-top:auto}
+body:not(.modal-open) .modal-backdrop{display:none!important;pointer-events:none!important}
 
 "
 
@@ -437,6 +439,11 @@ $(document).on('shiny:connected', function() {
     var status = (m && m.status) ? m.status : '';
     $('.status-chip').removeClass('is-on');
     $('.status-chip[data-status=\"' + status + '\"]').addClass('is-on');
+  });
+  Shiny.addCustomMessageHandler('cleanupModal', function(m) {
+    $('.modal-backdrop').remove();
+    $('body').removeClass('modal-open').css({'overflow': '', 'padding-right': ''});
+    $('.modal:not(.show)').remove();
   });
   Shiny.addCustomMessageHandler('mark', function(m) {
     $('.req-bad').removeClass('req-bad');
@@ -454,6 +461,20 @@ $(document).on('shiny:connected', function() {
     $('#fcount').text(m.n).css('display', m.n > 0 ? 'inline-block' : 'none');
   });
 });
+$(document).on('hidden.bs.modal hide.bs.modal', function() {
+  setTimeout(function() {
+    if (!$('.modal.show').length) {
+      $('.modal-backdrop').remove();
+      $('body').removeClass('modal-open').css({'overflow': '', 'padding-right': ''});
+    }
+  }, 100);
+});
+setInterval(function() {
+  if (!$('.modal.show').length && ($('.modal-backdrop').length || $('body').hasClass('modal-open'))) {
+    $('.modal-backdrop').remove();
+    $('body').removeClass('modal-open').css({'overflow': '', 'padding-right': ''});
+  }
+}, 250);
 // a field counts as 'touched' once the user leaves it
 $(document).on('focusout', '.nr .shiny-input-container', function() {
   var id = this.id || $(this).find('select,input,textarea').first().attr('id');

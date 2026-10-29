@@ -1,3 +1,13 @@
+  SCENARIO_CHOICES <- c(
+    "Select scenario"              = "",
+    "A \u2014 Direct purchase"     = "A",
+    "B \u2014 Quotations"           = "B",
+    "C \u2014 Contract"             = "C",
+    "D \u2014 National tender"      = "D",
+    "E \u2014 International tender" = "E",
+    "G \u2014 Framework agreement"  = "G"
+  )
+
   # ---- New request: modal (Fix 4) ----
   observeEvent(input$new_request, {
     DEFAULTS <<- read_app_defaults()
@@ -35,13 +45,7 @@
               col(4, numericInput("amount", R("Amount"), NA, min = 0, width = "100%")),
               col(4, pick("currency", "Currency", CUR)),
               col(4, selectInput("procurement_scenario", R("Scenario"),
-                                 choices = c("Select" = "",
-                                             A = "A \u2014 Direct purchase",
-                                             B = "B \u2014 Quotations",
-                                             C = "C \u2014 Contract",
-                                             D = "D \u2014 National tender",
-                                             E = "E \u2014 International tender",
-                                             G = "G \u2014 Framework agreement"),
+                                 choices = SCENARIO_CHOICES,
                                  selected = "", width = "100%"))
           ),
           div(class = "form-section-rule"),
@@ -71,19 +75,23 @@
   observeEvent(input$cancel_new, removeModal())
   observeEvent(input$cancel_new_bottom, removeModal())
 
-  # Auto-select procurement scenario based on Amount & Currency (can be manually edited)
-  observeEvent(list(input$amount, input$currency, input$framework), {
-    amt <- input$amount
-    cur <- input$currency
+  # Auto-select procurement scenario: Amount drives scenario; Framework agreement overrides to G
+  observe({
+    is_fw <- isTRUE(input$framework)
+    if (is_fw) {
+      updateSelectInput(session, "procurement_scenario", selected = "G")
+      return()
+    }
+    amt <- suppressWarnings(as.numeric(input$amount))
+    cur <- input$currency %||% "ETB"
     if (has_num(amt) && amt > 0 && nzchar(cur) && cur %in% names(RATES)) {
       usd <- amt / RATES[[cur]]
-      waiver <- if (isTRUE(input$framework)) "Framework agreement" else "No"
-      scen <- scenario(usd, waiver)
-      if (scen %in% c("A", "B", "C", "D", "E", "G")) {
+      scen <- scenario(usd, "No")
+      if (scen %in% c("A", "B", "C", "D", "E")) {
         updateSelectInput(session, "procurement_scenario", selected = scen)
       }
     }
-  }, ignoreInit = TRUE)
+  })
 
   valid <- reactive(c(
     description          = nzchar(v(input$description)),
@@ -221,6 +229,7 @@
     })
     if (!saved) return()
     removeModal()
+    session$sendCustomMessage("cleanupModal", list())
     showNotification("Request added.", type = "message")
   })
 
@@ -508,7 +517,9 @@
     saved <- tryCatch({ update_expense_row(cn, id, row); TRUE }, error = function(e) {
       showNotification(paste("Could not proceed:", conditionMessage(e)), type = "error"); FALSE })
     if (!saved) return()
-    removeModal(); showNotification("Request moved to Pending. PO reference generated.", type = "message")
+    removeModal()
+    session$sendCustomMessage("cleanupModal", list())
+    showNotification("Request moved to Pending. PO reference generated.", type = "message")
   })
 
   # ---- Fix 1: Mark Paid ----
@@ -552,7 +563,9 @@
     saved <- tryCatch({ update_expense_row(cn, id, row); TRUE }, error = function(e) {
       showNotification(paste("Could not mark paid:", conditionMessage(e)), type = "error"); FALSE })
     if (!saved) return()
-    removeModal(); showNotification("Request marked as Paid.", type = "message")
+    removeModal()
+    session$sendCustomMessage("cleanupModal", list())
+    showNotification("Request marked as Paid.", type = "message")
   })
 
   # ---- Fix 1: Cancel ----
@@ -592,7 +605,9 @@
     saved <- tryCatch({ update_expense_row(cn, id, row); TRUE }, error = function(e) {
       showNotification(paste("Could not cancel:", conditionMessage(e)), type = "error"); FALSE })
     if (!saved) return()
-    removeModal(); showNotification("Request cancelled.", type = "error")
+    removeModal()
+    session$sendCustomMessage("cleanupModal", list())
+    showNotification("Request cancelled.", type = "error")
   })
 
   observeEvent(input$see_more, {
