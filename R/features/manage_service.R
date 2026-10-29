@@ -111,7 +111,7 @@
                           selectInput("edit_project_department", "Department", with_sel(c("Not specified" = "", DEPTS), r$department),
                                       selected = r$department, width = "100%"),
                           textInput("edit_project_location", "Default location", r$location, width = "100%"),
-                          footer = tagList(modalButton("Cancel"), actionButton("save_project_edit", "Save changes", class = "btn-primary")),
+                          footer = tagList(modal_cancel_button("Cancel"), actionButton("save_project_edit", "Save changes", class = "btn-primary")),
                           easyClose = TRUE))
     project_edit_id(as.integer(r$id[[1]]))
   })
@@ -137,7 +137,7 @@
     showModal(modalDialog(title = paste("Edit supplier", r$supplier_name),
                           textInput("edit_supplier_name", "Supplier name", r$supplier_name, width = "100%"),
                           checkboxInput("edit_supplier_active", "Active supplier", value = as.integer(r$active) == 1),
-                          footer = tagList(modalButton("Cancel"), actionButton("save_supplier_edit", "Save changes", class = "btn-primary")), easyClose = TRUE))
+                          footer = tagList(modal_cancel_button("Cancel"), actionButton("save_supplier_edit", "Save changes", class = "btn-primary")), easyClose = TRUE))
   })
   
   observeEvent(input$save_supplier_edit, {
@@ -161,7 +161,7 @@
                           textInput("edit_person_name", "Full name", r$full_name, width = "100%"),
                           selectInput("edit_person_department", "Department", with_sel(c("Not specified" = "", DEPTS), r$department), selected = r$department, width = "100%"),
                           checkboxInput("edit_person_active", "Active person", value = as.integer(r$active) == 1),
-                          footer = tagList(modalButton("Cancel"), actionButton("save_person_edit", "Save changes", class = "btn-primary")), easyClose = TRUE))
+                          footer = tagList(modal_cancel_button("Cancel"), actionButton("save_person_edit", "Save changes", class = "btn-primary")), easyClose = TRUE))
   })
   
   observeEvent(input$save_person_edit, {
@@ -183,7 +183,7 @@
                           textInput("edit_notify_email", "Email address", r$email, width = "100%"),
                           checkboxInput("edit_notify_weekly", "Weekly request summary", value = as.integer(r$weekly_report) == 1),
                           checkboxInput("edit_notify_active", "Active recipient", value = as.integer(r$active) == 1),
-                          footer = tagList(modalButton("Cancel"), actionButton("save_email_edit", "Save changes", class = "btn-primary")), easyClose = TRUE))
+                          footer = tagList(modal_cancel_button("Cancel"), actionButton("save_email_edit", "Save changes", class = "btn-primary")), easyClose = TRUE))
   })
   
   observeEvent(input$save_email_edit, {

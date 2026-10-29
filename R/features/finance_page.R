@@ -475,6 +475,9 @@ if (exists("input", inherits = FALSE) && exists("output", inherits = FALSE)) {
         } else {
           paste(length(projects), "projects")
         }
+        stored_name <- if ("batch_name" %in% names(r)) trimws(as.character(r$batch_name[[1]])) else ""
+        if (!length(stored_name) || is.na(stored_name[[1]])) stored_name <- ""
+        title_label <- if (nzchar(stored_name)) stored_name else if (grepl("^BTH-", code)) paste("Batch", code) else code
         total_amount <- suppressWarnings(as.numeric(r$total_amount[[1]]))
         total_label <- if (!length(total_amount) || is.na(total_amount[[1]])) {
           "\u2014"
@@ -492,6 +495,7 @@ if (exists("input", inherits = FALSE) && exists("output", inherits = FALSE)) {
           span(class = "fin-meta-item", icon("list"), included),
           span(class = "fin-meta-item", icon("coins"), total_label, " Total")
         )
+        if (nzchar(stored_name)) meta <- c(list(span(class = "fin-meta-item", code)), meta)
         if (identical(bucket, "applied")) {
           meta <- c(meta, list(span(class = "fin-meta-item", icon("circle-check"), paste0("Applied: ", card_date(r$confirmed_at[[1]])))))
         }
@@ -513,7 +517,7 @@ if (exists("input", inherits = FALSE) && exists("output", inherits = FALSE)) {
                 div(class = "fin-batch-icon", icon("file-lines")),
                 div(class = "fin-batch-copy",
                     div(class = "fin-batch-title",
-                        span(class = "fin-batch-code", if (grepl("^BTH-", code)) paste("Batch", code) else code),
+                        span(class = "fin-batch-code", title_label),
                         span(class = pill$class, pill$text)
                     ),
                     div(class = "fin-batch-meta", meta)
@@ -532,20 +536,34 @@ if (exists("input", inherits = FALSE) && exists("output", inherits = FALSE)) {
     )
   })
 
-  fin_batch_filename <- function(code) {
-    safe <- gsub("[^A-Za-z0-9_-]", "_", code)
+  fin_batch_filename <- function(code, batch_name = "") {
+    label <- if (nzchar(trimws(batch_name))) batch_name else code
+    safe <- gsub("[^A-Za-z0-9_-]", "_", label)
     safe <- gsub("_+", "_", safe)
     safe <- gsub("^_|_$", "", safe)
     if (!nzchar(safe)) safe <- "batch"
     paste0(safe, "_", format(Sys.Date(), "%Y%m%d"), ".xlsx")
   }
 
+  fin_batch_label <- function(batch) {
+    stored <- if ("batch_name" %in% names(batch)) trimws(as.character(batch$batch_name[[1]])) else ""
+    if (!length(stored) || is.na(stored[[1]]) || !nzchar(stored)) as.character(batch$batch_code[[1]]) else stored
+  }
+
+  fin_gbp_rates_ready <- function(currencies, rates) {
+    currencies <- toupper(trimws(as.character(currencies)))
+    currencies[is.na(currencies)] <- ""
+    foreign <- unique(currencies[nzchar(currencies) & currencies != "GBP"])
+    if (!length(foreign)) return(TRUE)
+    rate_names <- if (is.null(rates)) character() else names(rates)
+    "GBP" %in% rate_names && all(setdiff(foreign, "ETB") %in% rate_names)
+  }
+
   fin_write_batch_xlsx <- function(code, file) {
     pulled <- tryCatch(
       withReactiveDomain(session, isolate(list(
         batch = fin_find_batch(code),
-        rows = data(),
-        cur = active_currency()
+        rows = data()
       ))),
       error = function(e) e
     )
@@ -560,25 +578,36 @@ if (exists("input", inherits = FALSE) && exists("output", inherits = FALSE)) {
       write_xlsx(list(Batch = data.frame(Message = "This batch has no request lines")), file)
       return(invisible(FALSE))
     }
+    rates <- fin_effective_rates()
+    if (!fin_gbp_rates_ready(d$currency, rates)) {
+      write_xlsx(list(Batch = data.frame(
+        Message = "Currency conversion rates are missing, so the paid amount cannot be converted.",
+        stringsAsFactors = FALSE
+      )), file)
+      return(invisible(FALSE))
+    }
     d$amount_minor_value <- fin_amount_minor(d)
-    d$display_minor <- fin_to_display_minor(
-      d$amount_minor_value, d$currency, pulled$cur, euroinfo_month_rates()
-    )
-    d$display_minor[is.na(d$display_minor)] <- 0
-    sheet <- data.frame(
-      `Batch Code` = pulled$batch$batch_code[[1]],
-      `Project Code` = d$project_code,
-      `Budget Line` = d$budget_line,
-      `Request ID` = d$id,
-      Description = d$description,
-      `Original Amount` = fmt_amount(d$amount_minor_value),
-      `Original Currency` = d$currency,
-      `Display Amount` = fmt_amount(d$display_minor),
-      `Display Currency` = pulled$cur,
-      `Payment Date` = d$payment_date,
-      check.names = FALSE
-    )
-    write_xlsx(list(Request_Lines = sheet), file)
+    d$gbp_minor <- fin_to_display_minor(d$amount_minor_value, d$currency, "GBP", rates)
+    d$gbp_minor[is.na(d$gbp_minor)] <- 0
+    project <- fin_project_code(d$project_code)
+    line <- trimws(as.character(d$budget_line))
+    line[is.na(line) | !nzchar(line)] <- "(unassigned)"
+    pair <- paste(project, line, sep = "\u001f")
+    grouped <- split(d$gbp_minor, pair)
+    sheet <- do.call(rbind, lapply(names(grouped), function(key) {
+      parts <- strsplit(key, "\u001f", fixed = TRUE)[[1]]
+      data.frame(
+        `Batch Name` = fin_batch_label(pulled$batch),
+        `Project Code` = parts[[1]],
+        `Budget Line` = paste(parts[-1], collapse = "\u001f"),
+        `Paid Amount` = round(abs(sum(grouped[[key]], na.rm = TRUE)) / 100, 2),
+        check.names = FALSE,
+        stringsAsFactors = FALSE
+      )
+    }))
+    sheet <- sheet[order(sheet[["Project Code"]], sheet[["Budget Line"]]), , drop = FALSE]
+    rownames(sheet) <- NULL
+    write_xlsx(list(Paid_Lines = sheet), file)
     invisible(TRUE)
   }
 
@@ -598,6 +627,8 @@ if (exists("input", inherits = FALSE) && exists("output", inherits = FALSE)) {
   fin_export_base <- session$registerDataObj("fin_batch_xlsx", NULL, function(data, req) {
     query <- parseQueryString(req$QUERY_STRING %||% "")
     code <- trimws(as.character(query$batch %||% ""))
+    b <- fin_find_batch(code)
+    b_name <- if (!is.null(b)) fin_batch_label(b) else ""
     tmp <- tempfile(fileext = ".xlsx")
     on.exit(unlink(tmp), add = TRUE)
     tryCatch({
@@ -608,7 +639,7 @@ if (exists("input", inherits = FALSE) && exists("output", inherits = FALSE)) {
         content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         content = bytes,
         headers = list(
-          "Content-Disposition" = paste0("attachment; filename=\"", fin_batch_filename(code), "\""),
+          "Content-Disposition" = paste0("attachment; filename=\"", fin_batch_filename(code, b_name), "\""),
           "Cache-Control" = "no-store"
         )
       )

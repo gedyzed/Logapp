@@ -65,10 +65,12 @@
               col(12, textAreaInput("remarks", "Remarks", rows = 2, width = "100%"))
           )
       ),
-      footer = tagList(
+      footer = div(
+        class = "d-flex justify-content-between align-items-center w-100",
         actionButton("cancel_new", tagList(icon("arrow-left"), "Back"), class = "btn-outline-secondary"),
-        actionButton("clear", "Clear form", class = "btn-outline-secondary"),
-        actionButton("add", tagList(icon("plus"), "Add request"), class = "btn-primary")
+        div(class = "d-flex align-items-center gap-2",
+            actionButton("clear", "Clear form", class = "btn-outline-secondary"),
+            actionButton("add", tagList(icon("plus"), "Add request"), class = "btn-primary"))
       )
     ))
   })
@@ -308,22 +310,27 @@
 
     if (!edit_mode) {
       footer_btns <- if (isTRUE(read_only)) {
-        tagList(modalButton(tagList(icon("arrow-left"), "Back")))
+        div(class = "d-flex justify-content-start align-items-center w-100",
+            modalButton(tagList(icon("arrow-left"), "Back")))
       } else if (status == "under_review") {
-        tagList(
-          modalButton(tagList(icon("arrow-left"), "Back")),
-          actionButton("start_edit_modal", tagList(icon("pen-to-square"), "Edit"), class = "btn-outline-secondary"),
-          actionButton("btn_cancel_request", tagList(icon("xmark"), "Cancel request"), class = "btn-danger ms-auto"),
-          actionButton("btn_proceed", tagList(icon("arrow-right"), "Proceed"), class = "btn-primary"))
+        div(class = "d-flex justify-content-between align-items-center w-100",
+            div(class = "d-flex align-items-center gap-2",
+                modalButton(tagList(icon("arrow-left"), "Back")),
+                actionButton("start_edit_modal", tagList(icon("pen-to-square"), "Edit"), class = "btn-primary")),
+            div(class = "d-flex align-items-center gap-2",
+                actionButton("btn_cancel_request", tagList(icon("xmark"), "Cancel request"), class = "btn-outline-danger"),
+                actionButton("btn_proceed", tagList(icon("arrow-right"), "Proceed"), class = "btn-primary")))
       } else if (status == "pending") {
-        tagList(
-          modalButton(tagList(icon("arrow-left"), "Back")),
-          actionButton("start_edit_modal", tagList(icon("pen-to-square"), "Edit"), class = "btn-outline-secondary"),
-          actionButton("btn_cancel_request", tagList(icon("xmark"), "Cancel request"), class = "btn-danger ms-auto"),
-          actionButton("btn_pay", tagList(icon("circle-check"), "Mark Paid"), class = "btn-primary"))
+        div(class = "d-flex justify-content-between align-items-center w-100",
+            div(class = "d-flex align-items-center gap-2",
+                modalButton(tagList(icon("arrow-left"), "Back")),
+                actionButton("start_edit_modal", tagList(icon("pen-to-square"), "Edit"), class = "btn-primary")),
+            div(class = "d-flex align-items-center gap-2",
+                actionButton("btn_cancel_request", tagList(icon("xmark"), "Cancel request"), class = "btn-outline-danger"),
+                actionButton("btn_pay", tagList(icon("circle-check"), "Mark Paid"), class = "btn-primary")))
       } else {
-        tagList(modalButton(tagList(icon("arrow-left"), "Back")),
-                actionButton("start_edit_modal", tagList(icon("pen-to-square"), "Edit"), class = "btn-outline-secondary"))
+        div(class = "d-flex justify-content-start align-items-center w-100",
+            modalButton(tagList(icon("arrow-left"), "Back")))
       }
       showModal(modalDialog(
         title = div(class = "d-flex justify-content-between align-items-center w-100 pe-3",
@@ -399,9 +406,11 @@
                     div(class = "reference-item", div(class = "reference-label", "Purchase Order (PO)"), tags$code(class = "reference-value", po_ref))),
                 p(class = "reference-hint", if (po_is_preview) "Preview only: save to persist this PO reference."
                   else "OF and PO references are stored with the request and included in exports."))),
-        footer = tagList(
+        footer = div(
+          class = "d-flex justify-content-between align-items-center w-100",
           actionButton("cancel_edit_modal", tagList(icon("arrow-left"), "Back to view"), class = "btn-outline-secondary"),
-          actionButton("m_save", tagList(icon("check"), "Save changes"), class = "btn-primary"))))
+          actionButton("m_save", tagList(icon("check"), "Save changes"), class = "btn-primary")
+        )))
     }
   }
 
@@ -410,7 +419,16 @@
     if (length(id) != 1L || is.na(id)) { showNotification("Could not identify that request.", type = "warning"); return() }
     edit_id(id); render_request_modal(id, edit_mode = FALSE)
   })
-  observeEvent(input$start_edit_modal, { id <- edit_id(); if (!is.null(id)) render_request_modal(id, edit_mode = TRUE) })
+  observeEvent(input$start_edit_modal, {
+    id <- edit_id()
+    if (is.null(id)) return()
+    row <- data()[data()$id == id, , drop = FALSE]
+    if (nrow(row) && v(row$status[1]) %in% c("paid", "cancelled")) {
+      showNotification("Paid and cancelled requests are locked.", type = "warning")
+      return()
+    }
+    render_request_modal(id, edit_mode = TRUE)
+  })
   observeEvent(input$cancel_edit_modal, { id <- edit_id(); if (!is.null(id)) render_request_modal(id, edit_mode = FALSE) })
 
   observeEvent(input$m_project, {
@@ -427,6 +445,11 @@
     old <- data()[data()$id == id, , drop = FALSE]
     if (!nrow(old)) { removeModal(); return() }
     old <- old[1, , drop = FALSE]
+    if (v(old$status) %in% c("paid", "cancelled")) {
+      showNotification("Paid and cancelled requests are locked.", type = "warning")
+      removeModal()
+      return()
+    }
     ok  <- all(nzchar(c(v(input$m_desc), v(input$m_requested_by), v(input$m_project),
                         v(input$m_budget), v(input$m_dept), v(input$m_loc)))) &&
       has_num(input$m_amount) && input$m_amount > 0 && nzchar(v(input$m_cur))
@@ -479,8 +502,11 @@
                          options = list(create = TRUE, placeholder = "Type or choose a supplier")),
           textInput("proc_reason", "PO reason *", width = "100%", placeholder = "e.g. Vehicle Rent"),
           date_in("proc_po_date", "PO date *", Sys.Date(), width = "100%")),
-      footer = tagList(modalButton(tagList(icon("arrow-left"), "Back")),
-                       actionButton("btn_proceed_confirm", tagList(icon("check"), "Confirm Proceed"), class = "btn-primary"))))
+      footer = div(
+        class = "d-flex justify-content-between align-items-center w-100",
+        modalButton(tagList(icon("arrow-left"), "Back")),
+        actionButton("btn_proceed_confirm", tagList(icon("check"), "Confirm Proceed"), class = "btn-primary")
+      )))
   })
 
   observeEvent(input$btn_proceed_confirm, {
@@ -532,12 +558,10 @@
           p(class = "form-hint", "This records a payment assertion inside the tracker. No external payment is executed."),
           date_in("pay_date", "Payment date *", Sys.Date(), width = "100%"),
           checkboxInput("pay_confirm", "I confirm this request has been paid.", value = FALSE)),
-      footer = tagList(
+      footer = div(
+        class = "d-flex justify-content-between align-items-center w-100",
         modalButton(tagList(icon("arrow-left"), "Back")),
-        conditionalPanel(
-          condition = "input.pay_confirm == true",
-          actionButton("btn_pay_confirm", tagList(icon("check"), "Confirm Paid"), class = "btn-primary")
-        )
+        actionButton("btn_pay_confirm", tagList(icon("check"), "Confirm Paid"), class = "btn-primary", disabled = "disabled")
       )))
   })
 
@@ -563,6 +587,7 @@
     saved <- tryCatch({ update_expense_row(cn, id, row); TRUE }, error = function(e) {
       showNotification(paste("Could not mark paid:", conditionMessage(e)), type = "error"); FALSE })
     if (!saved) return()
+    reload_expenses()
     removeModal()
     session$sendCustomMessage("cleanupModal", list())
     showNotification("Request marked as Paid.", type = "message")
@@ -578,8 +603,11 @@
           p(class = "form-hint", "This action cannot be undone. The request will be marked Cancelled."),
           textAreaInput("cancel_reason", "Reason *", rows = 3, width = "100%",
                         placeholder = "Briefly explain why this request is being cancelled.")),
-      footer = tagList(modalButton(tagList(icon("arrow-left"), "Back")),
-                       actionButton("btn_cancel_confirm", tagList(icon("xmark"), "Confirm Cancel"), class = "btn-danger"))))
+      footer = div(
+        class = "d-flex justify-content-between align-items-center w-100",
+        modalButton(tagList(icon("arrow-left"), "Back")),
+        actionButton("btn_cancel_confirm", tagList(icon("xmark"), "Confirm Cancel"), class = "btn-danger")
+      )))
   })
 
   observeEvent(input$btn_cancel_confirm, {

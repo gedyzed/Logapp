@@ -36,27 +36,40 @@
   session$onSessionEnded(function() {
     if (DBI::dbIsValid(poll_cn)) DBI::dbDisconnect(poll_cn)
   })
-  db_poll <- reactivePoll(
-    1000, session,
-    checkFunc = function() as.character(dbGetQuery(poll_cn, "PRAGMA data_version")[[1]][[1]]),
-    valueFunc = function() {
-      rows <- dbGetQuery(poll_cn,
-                         "SELECT e.*, p.project_code, bl.budget_line_code AS budget_line
+  load_expense_rows <- function(cn) {
+    rows <- dbGetQuery(cn,
+                       "SELECT e.*, p.project_code, bl.budget_line_code AS budget_line
          FROM expenses e
          LEFT JOIN budget_lines bl ON bl.id = e.budget_line_id
          LEFT JOIN projects p ON p.id = bl.project_id
          ORDER BY e.id DESC")
-      # Include the database revision so catalogue/default changes invalidate dependants
-      # even when the expense rows themselves are unchanged.
-      attr(rows, "database_revision") <- as.character(dbGetQuery(poll_cn, "PRAGMA data_version")[[1]][[1]])
-      rows
-    }
+    # Include the database revision so catalogue/default changes invalidate dependants
+    # even when the expense rows themselves are unchanged.
+    attr(rows, "database_revision") <- as.character(dbGetQuery(cn, "PRAGMA data_version")[[1]][[1]])
+    rows
+  }
+  db_poll <- reactivePoll(
+    1000, session,
+    checkFunc = function() as.character(dbGetQuery(poll_cn, "PRAGMA data_version")[[1]][[1]]),
+    valueFunc = function() load_expense_rows(poll_cn)
   )
+  # Same-session writes do not change data_version on poll_cn. Mark Paid stores a
+  # fresh read here so Financial Updates does not wait for the next poll.
+  expense_rows <- reactiveVal(NULL)
+  observeEvent(db_poll(), {
+    expense_rows(db_poll())
+  }, ignoreInit = FALSE)
+  reload_expenses <- function() {
+    cn <- con()
+    on.exit(if (DBI::dbIsValid(cn)) DBI::dbDisconnect(cn), add = TRUE)
+    expense_rows(load_expense_rows(cn))
+  }
   dashboard_last_refresh <- reactiveVal(Sys.time())
   observeEvent(db_poll(), dashboard_last_refresh(Sys.time()), ignoreInit = FALSE)
   
   data <- reactive({
-    d <- db_poll()
+    d <- expense_rows()
+    req(is.data.frame(d))
     if ("status" %in% names(d)) {
       old <- !is.na(d$status)
       d$status[old & d$status == "waiting"] <- "under_review"

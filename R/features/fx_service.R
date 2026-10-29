@@ -34,3 +34,24 @@ euroinfo_month_rates <- function(month = format(Sys.Date(), "%Y-%m")) {
   if (!length(rates)) NULL else rates
 }
 
+# Return EuroInfo rates if available in the database; otherwise fall back to default
+# conversion rates (from RATES in config.R) so finance calculations and exports work
+# smoothly until EuroInfo tables are loaded.
+fin_effective_rates <- function(month = format(Sys.Date(), "%Y-%m")) {
+  rates <- euroinfo_month_rates(month)
+  default_rates <- c(
+    USD = unname(RATES[["ETB"]] / RATES[["USD"]]),
+    EUR = unname(RATES[["ETB"]] / RATES[["EUR"]]),
+    GBP = unname(RATES[["ETB"]] / RATES[["GBP"]]),
+    ETB = 1
+  )
+  if (is.null(rates)) return(default_rates)
+  for (k in names(default_rates)) {
+    if (!k %in% names(rates) || is.na(rates[[k]]) || rates[[k]] <= 0) {
+      rates[[k]] <- default_rates[[k]]
+    }
+  }
+  rates
+}
+
+

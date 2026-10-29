@@ -7,6 +7,7 @@
 fin_project_pick <- reactiveVal(character())
 fin_history_tab <- reactiveVal("active")
 fin_pending_code <- reactiveVal("")
+fin_batch_draft <- reactiveVal(NULL)
 
 fin_selected_projects <- function(value) {
   if (is.null(value)) return(character())
@@ -147,7 +148,7 @@ fin_base <- reactive({
   d <- d[d$status == "paid" & undeducted, , drop = FALSE]
   d$amount_minor_value <- fin_amount_minor(d)
   d$display_minor <- fin_to_display_minor(
-    d$amount_minor_value, d$currency, active_currency(), euroinfo_month_rates()
+    d$amount_minor_value, d$currency, active_currency(), fin_effective_rates()
   )
   d$line_key <- fin_line_key(d$project_code, d$budget_line)
   d
@@ -178,7 +179,7 @@ fin_parse_ids <- function(request_ids) {
 }
 
 fin_load_batches <- function() {
-  rows <- db_get("SELECT id, batch_code, project_codes, request_ids, total_amount, currency, status, created, confirmed_at
+  rows <- db_get("SELECT id, batch_code, batch_name, project_codes, request_ids, total_amount, currency, status, created, confirmed_at
                   FROM financial_batches ORDER BY id DESC")
   rows$request_id_list <- if (nrow(rows)) fin_parse_ids(rows$request_ids) else vector("list", 0)
   rows$bucket <- if (nrow(rows)) fin_status_bucket(rows$status) else character()
@@ -326,6 +327,48 @@ observeEvent(input$fin_btn_batch, {
   }
   projects <- picked$ready
   part <- picked$pend
+  total <- sum(replace(part$display_minor, is.na(part$display_minor), 0)) / 100
+  cur <- active_currency()
+  fin_batch_draft(list(projects = projects))
+  showModal(modalDialog(
+    title = "Name this batch",
+    div(class = "nr",
+        textInput("fin_batch_name", "Batch name *", value = "", width = "100%",
+                  placeholder = "Name used on the batch card and in the export"),
+        p(tags$b("Projects: "), paste(projects, collapse = ", ")),
+        p(class = "mb-0", tags$b("Total: "), fin_signed_major(total, cur))),
+    footer = tagList(
+      modal_cancel_button("Cancel"),
+      actionButton("fin_btn_batch_create", "Create batch", class = "btn-primary")
+    ),
+    easyClose = TRUE
+  ))
+})
+
+observeEvent(input$fin_btn_batch_create, {
+  draft <- fin_batch_draft()
+  if (is.null(draft)) {
+    removeModal()
+    return()
+  }
+  name <- trimws(v(input$fin_batch_name))
+  if (!nzchar(name)) {
+    showNotification("Enter a name for the batch.", type = "warning")
+    return()
+  }
+  if (nchar(name) > 80) {
+    showNotification("Batch name must be 80 characters or fewer.", type = "warning")
+    return()
+  }
+  part <- fin_pool()
+  if (nrow(part)) part <- part[fin_project_code(part$project_code) %in% draft$projects, , drop = FALSE]
+  if (!nrow(part)) {
+    removeModal()
+    fin_batch_draft(NULL)
+    showNotification("Selected projects have no paid lines left to batch.", type = "warning")
+    return()
+  }
+  projects <- sort(unique(fin_project_code(part$project_code)))
   ids <- sort(unique(as.integer(part$id)))
   total <- sum(replace(part$display_minor, is.na(part$display_minor), 0)) / 100
   cur <- active_currency()
@@ -336,8 +379,8 @@ observeEvent(input$fin_btn_batch, {
   for (attempt in 1:2) {
     batch_code <- fin_next_batch_code()
     saved <- tryCatch({
-      dbExecute(cn, "INSERT INTO financial_batches(batch_code, project_codes, request_ids, total_amount, currency, status, created, confirmed_at) VALUES(?,?,?,?,?,?,?,?)",
-                params = list(batch_code, paste(projects, collapse = "|"), paste(ids, collapse = ","),
+      dbExecute(cn, "INSERT INTO financial_batches(batch_code, batch_name, project_codes, request_ids, total_amount, currency, status, created, confirmed_at) VALUES(?,?,?,?,?,?,?,?,?)",
+                params = list(batch_code, name, paste(projects, collapse = "|"), paste(ids, collapse = ","),
                               total, cur, "active", stamp, NA))
       TRUE
     }, error = function(e) FALSE)
@@ -350,9 +393,11 @@ observeEvent(input$fin_btn_batch, {
     showNotification("Could not create the batch. Try again.", type = "warning")
     return()
   }
+  fin_batch_draft(NULL)
+  removeModal()
   fin_history_tab("active")
   session$sendCustomMessage("fin-show-history", list())
-  showNotification(paste0("Batch ", saved_code, " is active. Confirm it after the deduction, or reject it to return the projects."), type = "message")
+  showNotification(paste0(name, " is active. Confirm it after the deduction, or reject it to return the projects."), type = "message")
 })
 
 observeEvent(input$fin_btn_reject, {
@@ -368,7 +413,7 @@ observeEvent(input$fin_btn_reject, {
       " to the list. Nothing is deducted."),
     if (length(projects)) p(class = "mb-0", tags$b("Projects: "), paste(projects, collapse = ", ")),
     footer = tagList(
-      modalButton("Cancel"),
+      modal_cancel_button("Cancel"),
       actionButton("fin_btn_reject_proceed", "Reject batch", class = "btn-danger text-white")
     ),
     easyClose = TRUE
@@ -413,7 +458,7 @@ observeEvent(input$fin_btn_confirm, {
           " Paid spending in this batch is cleared and each project's checkpoint is stored.")
     ),
     footer = tagList(
-      modalButton("Cancel"),
+      modal_cancel_button("Cancel"),
       actionButton("fin_btn_confirm_proceed", tagList(icon("circle-check"), " Confirm applied"),
                    class = "btn-primary")
     ),

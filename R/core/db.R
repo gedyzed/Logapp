@@ -276,6 +276,10 @@ init_db <- function() {
     created TEXT,
     confirmed_at TEXT
   )")
+  batch_fields <- dbListFields(cn, "financial_batches")
+  if (!"batch_name" %in% batch_fields) {
+    dbExecute(cn, "ALTER TABLE financial_batches ADD COLUMN batch_name TEXT")
+  }
 }
 tryCatch(
   init_db(),
