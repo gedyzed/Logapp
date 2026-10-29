@@ -11,12 +11,13 @@ ui <- function(request) {
     header = tagList(tags$style(css), tags$script(HTML(js))),
     footer = tags$footer(class = "app-footer",
                          tags$img(src = "acted-logo.png", class = "footer-logo", alt = "ACTED"),
-                         span("Logapp · Expense tracker")),
+                         span(class = "footer-copy", paste0("\u00a9 ", format(Sys.Date(), "%Y"), ". Log app. Expense tracker"))),
     
     # Requests: status cards span the page. Filters sit beside the register, as in the reference.
     nav_panel(
       title = "Requests", value = "requests",
       div(class = "requests-page",
+          uiOutput("weekly_report_banner"),
           div(class = "page-heading",
               div(h1("Requests"), p("Track, review and approve all organizational expenses in one place.")),
               div(class = "d-flex align-items-center gap-2",
@@ -301,19 +302,19 @@ ui <- function(request) {
                                )
                           )
                       ),
-                      div(class = "manage-two-col mt-3",
+                      div(class = "manage-defaults-row mt-3",
                           card(class = "manage-card", fill = FALSE,
                                card_header(tagList(icon("cog"), " Defaults")),
                                div(class = "card-body nr",
                                    p(class = "manage-note", "Defaults prefill future requests. Changing them does not rewrite existing records."),
                                    div(class = "fg",
-                                       col(12, selectizeInput("cfg_default_submitter", "Logistics focal point", choices = DEFAULTS$submitted_by,
-                                                              selected = DEFAULTS$submitted_by, width = "100%", options = list(create = TRUE, placeholder = "Type or choose a name"))),
-                                       col(12, selectizeInput("cfg_default_country", "Default country", choices = DEFAULTS$country,
-                                                              selected = DEFAULTS$country, width = "100%", options = list(create = TRUE, placeholder = "Type or choose a country"))),
-                                       col(12, selectInput("cfg_default_currency", "Default currency", choices = CUR,
+                                       col(4, selectizeInput("cfg_default_submitter", "Logistics focal point", choices = DEFAULTS$submitted_by,
+                                                             selected = DEFAULTS$submitted_by, width = "100%", options = list(create = TRUE, placeholder = "Type or choose a name"))),
+                                       col(4, selectizeInput("cfg_default_country", "Default country", choices = DEFAULTS$country,
+                                                             selected = DEFAULTS$country, width = "100%", options = list(create = TRUE, placeholder = "Type or choose a country"))),
+                                       col(4, selectInput("cfg_default_currency", "Default currency", choices = CUR,
                                                            selected = DEFAULTS$currency, width = "100%")),
-                                       col(12, div(class = "action-bar", actionButton("cfg_save_defaults", tagList(icon("save"), "Save defaults"), class = "btn-primary")))
+                                       col(12, div(class = "action-bar mt-2", actionButton("cfg_save_defaults", tagList(icon("save"), "Save defaults"), class = "btn-primary")))
                                    )
                                )
                           )
@@ -323,29 +324,6 @@ ui <- function(request) {
       )
     ),
     
-    # Full-page request form; kept as a programmatically opened page.
-    nav_panel(
-      title = "New request", value = "new",
-      div(class = "page-shell",
-          div(class = "page-heading",
-              div(h1("New request"), p("Enter a procurement request. Fields without an asterisk are optional.")),
-              actionButton("cancel_new", tagList(icon("arrow-left"), "Back to requests"), class = "btn-outline-secondary")
-          ),
-          layout_columns(fill = FALSE, col_widths = c(8, 4),
-                         card(fill = FALSE,
-                              div(class = "card-body",
-                                  uiOutput("new_form_ui"),
-                                  div(class = "action-bar",
-                                      actionButton("clear", "Clear form", class = "btn-outline-secondary"),
-                                      actionButton("cancel_new_bottom", "Cancel", class = "btn-outline-secondary"),
-                                      actionButton("add", "Add request", class = "btn-primary")
-                                  )
-                              )
-                         ),
-                         card(card_header("Request preview"), div(class = "card-body", uiOutput("preview")))
-          )
-      )
-    ),
     nav_spacer(),
     nav_item(
       div(class = "d-flex align-items-center global-currency-wrap",
@@ -354,7 +332,7 @@ ui <- function(request) {
                       selected = DEFAULTS$currency, width = "8.6rem")
       )
     ),
-    nav_item(input_dark_mode(id = "mode")),
+    nav_item(input_dark_mode(id = "mode", mode = "light")),
     nav_item(actionButton("share_nav", NULL, icon = icon("share-square"),
                           class = "nav-icon-btn", title = "Share this view", `aria-label` = "Share this view")),
     nav_item(actionButton("settings_open", NULL, icon = icon("gear"),

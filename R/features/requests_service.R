@@ -8,24 +8,25 @@
   person_edit_id <- reactiveVal(NULL)
   email_edit_id <- reactiveVal(NULL)
   
-  observeEvent(input$table_status_filter, {
-    request_table_status(v(input$table_status_filter))
-  }, ignoreInit = FALSE)
   set_request_status <- function(status = "") {
     status <- if (status %in% STATUS) status else ""
     request_table_status(status)
     session$sendCustomMessage("setTableStatus", list(status = status))
   }
+  toggle_request_status <- function(target_status) {
+    new_status <- if (identical(request_table_status(), target_status)) "" else target_status
+    set_request_status(new_status)
+  }
   observeEvent(input$card_status_all, set_request_status(""), ignoreInit = TRUE)
-  observeEvent(input$card_status_waiting, set_request_status("under_review"), ignoreInit = TRUE)
-  observeEvent(input$card_status_validation, set_request_status("pending"), ignoreInit = TRUE)
-  observeEvent(input$card_status_paid, set_request_status("paid"), ignoreInit = TRUE)
-  observeEvent(input$card_status_rejected, set_request_status("cancelled"), ignoreInit = TRUE)
+  observeEvent(input$card_status_waiting, toggle_request_status("under_review"), ignoreInit = TRUE)
+  observeEvent(input$card_status_validation, toggle_request_status("pending"), ignoreInit = TRUE)
+  observeEvent(input$card_status_paid, toggle_request_status("paid"), ignoreInit = TRUE)
+  observeEvent(input$card_status_rejected, toggle_request_status("cancelled"), ignoreInit = TRUE)
   observeEvent(input$chip_status_all, set_request_status(""), ignoreInit = TRUE)
-  observeEvent(input$chip_status_waiting, set_request_status("under_review"), ignoreInit = TRUE)
-  observeEvent(input$chip_status_validation, set_request_status("pending"), ignoreInit = TRUE)
-  observeEvent(input$chip_status_paid, set_request_status("paid"), ignoreInit = TRUE)
-  observeEvent(input$chip_status_rejected, set_request_status("cancelled"), ignoreInit = TRUE)
+  observeEvent(input$chip_status_waiting, toggle_request_status("under_review"), ignoreInit = TRUE)
+  observeEvent(input$chip_status_validation, toggle_request_status("pending"), ignoreInit = TRUE)
+  observeEvent(input$chip_status_paid, toggle_request_status("paid"), ignoreInit = TRUE)
+  observeEvent(input$chip_status_rejected, toggle_request_status("cancelled"), ignoreInit = TRUE)
   
   
   # ---- read live rows from the shared SQLite database ----
@@ -35,27 +36,40 @@
   session$onSessionEnded(function() {
     if (DBI::dbIsValid(poll_cn)) DBI::dbDisconnect(poll_cn)
   })
-  db_poll <- reactivePoll(
-    1000, session,
-    checkFunc = function() as.character(dbGetQuery(poll_cn, "PRAGMA data_version")[[1]][[1]]),
-    valueFunc = function() {
-      rows <- dbGetQuery(poll_cn,
-                         "SELECT e.*, p.project_code, bl.budget_line_code AS budget_line
+  load_expense_rows <- function(cn) {
+    rows <- dbGetQuery(cn,
+                       "SELECT e.*, p.project_code, bl.budget_line_code AS budget_line
          FROM expenses e
          LEFT JOIN budget_lines bl ON bl.id = e.budget_line_id
          LEFT JOIN projects p ON p.id = bl.project_id
          ORDER BY e.id DESC")
-      # Include the database revision so catalogue/default changes invalidate dependants
-      # even when the expense rows themselves are unchanged.
-      attr(rows, "database_revision") <- as.character(dbGetQuery(poll_cn, "PRAGMA data_version")[[1]][[1]])
-      rows
-    }
+    # Include the database revision so catalogue/default changes invalidate dependants
+    # even when the expense rows themselves are unchanged.
+    attr(rows, "database_revision") <- as.character(dbGetQuery(cn, "PRAGMA data_version")[[1]][[1]])
+    rows
+  }
+  db_poll <- reactivePoll(
+    1000, session,
+    checkFunc = function() as.character(dbGetQuery(poll_cn, "PRAGMA data_version")[[1]][[1]]),
+    valueFunc = function() load_expense_rows(poll_cn)
   )
+  # Same-session writes do not change data_version on poll_cn. Mark Paid stores a
+  # fresh read here so Financial Updates does not wait for the next poll.
+  expense_rows <- reactiveVal(NULL)
+  observeEvent(db_poll(), {
+    expense_rows(db_poll())
+  }, ignoreInit = FALSE)
+  reload_expenses <- function() {
+    cn <- con()
+    on.exit(if (DBI::dbIsValid(cn)) DBI::dbDisconnect(cn), add = TRUE)
+    expense_rows(load_expense_rows(cn))
+  }
   dashboard_last_refresh <- reactiveVal(Sys.time())
   observeEvent(db_poll(), dashboard_last_refresh(Sys.time()), ignoreInit = FALSE)
   
   data <- reactive({
-    d <- db_poll()
+    d <- expense_rows()
+    req(is.data.frame(d))
     if ("status" %in% names(d)) {
       old <- !is.na(d$status)
       d$status[old & d$status == "waiting"] <- "under_review"
@@ -236,6 +250,23 @@
     d
   })
   filtered <- reactive(base())
+
+  # Weekly report: all requests registered from Monday of current week through today.
+  # The display window is today only (for testing; production: Friday afternoon).
+  weekly_data <- reactive({
+    d <- data()
+    today <- Sys.Date()
+    # Monday of current week
+    mon <- today - (as.integer(format(today, "%u")) - 1L)
+    reg_dates <- suppressWarnings(as.Date(substr(as.character(d$created), 1, 10)))
+    d[!is.na(reg_dates) & reg_dates >= mon & reg_dates <= today, , drop = FALSE]
+  })
+
+  weekly_window_active <- reactive({
+    # Show the weekly report banner today (testing mode).
+    # Production: only show on Fridays after 14:00 EAT.
+    TRUE
+  })
   
   # Dashboard period helpers. Request values/status counts follow order_date; actual paid spend follows payment_date.
   dashboard_period_bounds <- function(offset = 0L) {

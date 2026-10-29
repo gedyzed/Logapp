@@ -1,3 +1,29 @@
+  calc_overdue_flags <- function(df) {
+    if (!is.data.frame(df) || !nrow(df)) return(logical(0))
+    vapply(seq_len(nrow(df)), function(i) {
+      r <- df[i, , drop = FALSE]
+      st <- if ("status" %in% names(r)) as.character(r$status[[1]]) else ""
+      if (!identical(st, "pending")) return(FALSE)
+      waiver_txt <- if ("waiver" %in% names(r)) as.character(r$waiver[[1]]) else "No"
+      usd_val <- if ("usd" %in% names(r)) suppressWarnings(as.numeric(r$usd[[1]])) else NA_real_
+      scen <- if ("procurement_scenario" %in% names(r) && nzchar(trimws(as.character(r$procurement_scenario[[1]] %||% "")))) {
+        as.character(r$procurement_scenario[[1]])
+      } else {
+        scenario(usd_val, waiver_txt)
+      }
+      days_limit <- if (exists("SCENARIO_DAYS") && scen %in% names(SCENARIO_DAYS)) SCENARIO_DAYS[[scen]] else 14L
+      pdate <- if ("po_date" %in% names(r)) suppressWarnings(as.Date(r$po_date[[1]])) else as.Date(NA)
+      if (is.na(pdate)) {
+        pdate <- if ("order_date" %in% names(r)) suppressWarnings(as.Date(r$order_date[[1]])) else as.Date(NA)
+      }
+      if (is.na(pdate) && "created" %in% names(r)) {
+        pdate <- suppressWarnings(as.Date(substr(as.character(r$created[[1]]), 1, 10)))
+      }
+      if (is.na(pdate)) return(FALSE)
+      as.numeric(Sys.Date() - pdate) > days_limit
+    }, logical(1))
+  }
+
   output$request_status_cards <- renderUI({
     d <- filtered()
     selected <- request_table_status()
@@ -12,7 +38,15 @@
       weeks <- format(suppressWarnings(as.Date(paid$payment_date)), "%G-W%V")
       paid_week <- sum(!is.na(weeks) & weeks == format(Sys.Date(), "%G-W%V"))
     }
-    make_card <- function(id, label, status, tone, icon_name, note) {
+    pending_part <- if (nrow(d)) d[d$status == "pending" & !is.na(d$status), , drop = FALSE] else d[0, , drop = FALSE]
+    pending_overdue_count <- sum(calc_overdue_flags(pending_part))
+    pending_badge <- if (pending_overdue_count > 0) {
+      div(class = "status-overdue-pill", icon("circle-exclamation"), paste("Overdue:", pending_overdue_count))
+    } else {
+      div(class = "status-card-note", "In progress")
+    }
+
+    make_card <- function(id, label, status, tone, icon_name, note, extra_bottom = NULL) {
       part <- if (nzchar(status)) d[d$status == status & !is.na(d$status), , drop = FALSE] else d
       actionButton(id,
                    tagList(
@@ -21,13 +55,13 @@
                          span(class = "status-card-icon", icon(icon_name))),
                      div(class = "status-card-value", format(nrow(part), big.mark = ",")),
                      div(class = "status-card-amount", paste(cur, money(amount_of(part)))),
-                     div(class = "status-card-note", note)
+                     if (!is.null(extra_bottom)) extra_bottom else div(class = "status-card-note", note)
                    ),
                    class = paste("status-card", tone, if (identical(selected, status)) "is-active" else ""))
     }
     div(class = "request-status-grid",
         make_card("card_status_waiting", "Under review", "under_review", "tone-review", "magnifying-glass", "Awaiting review"),
-        make_card("card_status_validation", "Pending", "pending", "tone-pending", "clock", "In progress"),
+        make_card("card_status_validation", "Pending", "pending", "tone-pending", "clock", "In progress", extra_bottom = pending_badge),
         make_card("card_status_paid", "Paid", "paid", "tone-paid", "circle-check",
                   if (paid_week > 0) paste0("+", paid_week, " this week") else "Paid requests"),
         make_card("card_status_rejected", "Cancelled", "cancelled", "tone-cancelled", "circle-xmark", "Closed requests"))
@@ -51,9 +85,9 @@
       delta <- paid_value - previous_paid_value
       pct <- (delta / previous_paid_value) * 100
       delta_class <- if (delta >= 0) "positive" else "negative"
-      delta_sign <- if (delta >= 0) "+" else "−"
+      delta_sign <- if (delta >= 0) "+" else "âˆ’"
       paid_comparison <- div(class = paste("metric-comparison", delta_class),
-                             paste0(delta_sign, currency, " ", abbr(abs(delta)), " · ", delta_sign,
+                             paste0(delta_sign, currency, " ", abbr(abs(delta)), " Â· ", delta_sign,
                                     formatC(abs(pct), format = "f", digits = 1), "% vs ", dashboard_period_label(-1L)))
     } else if (paid_value > 0) {
       paid_comparison <- span(class = "metric-note", paste("No paid spend in", dashboard_period_label(-1L)))
@@ -136,9 +170,9 @@
                            expand = expansion(mult = c(0, .27))) +
         labs(x = NULL, y = NULL,
              subtitle = if (report == "status_count") {
-               paste("Request count · request/order date ·", dashboard_period_label())
+               paste("Request count Â· request/order date Â·", dashboard_period_label())
              } else {
-               paste("Request value by status · request/order date ·", currency, "·", dashboard_period_label())
+               paste("Request value by status Â· request/order date Â·", currency, "Â·", dashboard_period_label())
              }) + chart_theme(fg)
       return(plot)
     }
@@ -168,7 +202,7 @@
                geom_text(aes(label = pie_label), position = position_stack(vjust = .5),
                          colour = "white", fontface = "bold", size = 3.5) +
                scale_fill_manual(values = pie_values, name = "Department") +
-               labs(subtitle = paste("Paid spend by department · payment date ·", currency, "·", dashboard_period_label()), x = NULL, y = NULL) +
+               labs(subtitle = paste("Paid spend by department Â· payment date Â·", currency, "Â·", dashboard_period_label()), x = NULL, y = NULL) +
                chart_theme(fg) + theme(axis.text = element_blank(), axis.ticks = element_blank(),
                                        panel.grid = element_blank(), axis.title = element_blank(), legend.position = "right"))
     }
@@ -183,10 +217,10 @@
     g$label <- factor(g$label, levels = rev(g$label))
     ggplot(g, aes(x = label, y = total)) +
       geom_col(fill = "#0284c7", width = .64) +
-      geom_text(aes(label = paste0(abbr(total), " · ", requests, " req.")), hjust = -.15, colour = fg, size = 3.2) +
+      geom_text(aes(label = paste0(abbr(total), " Â· ", requests, " req.")), hjust = -.15, colour = fg, size = 3.2) +
       coord_flip(clip = "off") +
       scale_y_continuous(labels = abbr, expand = expansion(mult = c(0, .32))) +
-      labs(subtitle = paste("Top projects by paid spend · payment date ·", currency, "·", dashboard_period_label()),
+      labs(subtitle = paste("Top projects by paid spend Â· payment date Â·", currency, "Â·", dashboard_period_label()),
            x = NULL, y = NULL) + chart_theme(fg)
   }, bg = "transparent", res = 96)
   
@@ -228,7 +262,7 @@
       scale_x_date(date_breaks = date_breaks, date_labels = date_labels,
                    limits = c(min(buckets), max(buckets))) +
       scale_y_continuous(labels = abbr, expand = expansion(mult = c(0, .14))) +
-      labs(subtitle = paste("Paid spend by payment date ·", dashboard_period_label(), "·", currency),
+      labs(subtitle = paste("Paid spend by payment date Â·", dashboard_period_label(), "Â·", currency),
            x = NULL, y = NULL) + chart_theme(fg) +
       theme(axis.text.x = element_text(angle = if (period_type == "month") 0 else 0, hjust = .5))
   }, bg = "transparent", res = 96)
@@ -335,7 +369,7 @@
                 position = position_dodge(width = 0.78), vjust = -0.4, size = 3, colour = fg) +
       scale_fill_manual(values = pal, name = "Year") +
       scale_y_continuous(labels = abbr, expand = expansion(mult = c(0, 0.16))) +
-      labs(subtitle = paste0("Paid spend by month · Jan–Dec · ", yr_summary),
+      labs(subtitle = paste0("Paid spend by month Â· Janâ€“Dec Â· ", yr_summary),
            x = NULL, y = NULL) +
       chart_theme(fg) +
       theme(legend.position = "top", legend.justification = "right",
@@ -353,7 +387,7 @@
 
     df$year <- format(df$plot_date, "%Y")
     q_nums <- ceiling(as.integer(format(df$plot_date, "%m")) / 3)
-    q_labels <- c("Q1 (Jan–Mar)", "Q2 (Apr–Jun)", "Q3 (Jul–Sep)", "Q4 (Oct–Dec)")
+    q_labels <- c("Q1 (Janâ€“Mar)", "Q2 (Aprâ€“Jun)", "Q3 (Julâ€“Sep)", "Q4 (Octâ€“Dec)")
     df$quarter <- factor(q_labels[q_nums], levels = q_labels)
     df$amount <- as.numeric(df[[currency]])
 
@@ -400,7 +434,7 @@
                 position = position_dodge(width = 0.75), vjust = -0.4, size = 3.3, colour = fg) +
       scale_fill_manual(values = pal, name = "Year") +
       scale_y_continuous(labels = abbr, expand = expansion(mult = c(0, 0.16))) +
-      labs(subtitle = paste0("Paid spend by quarter · payment date · ", yr_summary),
+      labs(subtitle = paste0("Paid spend by quarter Â· payment date Â· ", yr_summary),
            x = NULL, y = NULL) +
       chart_theme(fg) +
       theme(legend.position = "top", legend.justification = "right",
@@ -435,7 +469,7 @@
     d <- d[order(d$order_dt, d$id), , drop = FALSE]
     d$idx <- seq_len(nrow(d))
     d$is_ontime <- d$actual_days <= d$expected_days
-    d$perf_status <- ifelse(d$is_ontime, "On-time (≤ Expected)", "Delayed (> Expected)")
+    d$perf_status <- ifelse(d$is_ontime, "On-time (â‰¤ Expected)", "Delayed (> Expected)")
 
     ontime_count <- sum(d$is_ontime)
     total_count <- nrow(d)
@@ -444,9 +478,9 @@
     avg_expected <- round(mean(d$expected_days), 1)
 
     sub_txt <- paste0(
-      dashboard_period_label(), " · ",
-      ontime_count, "/", total_count, " on-time (", ontime_pct, "%) · ",
-      "Avg actual: ", avg_actual, " days · Avg standard: ", avg_expected, " days"
+      dashboard_period_label(), " Â· ",
+      ontime_count, "/", total_count, " on-time (", ontime_pct, "%) Â· ",
+      "Avg actual: ", avg_actual, " days Â· Avg standard: ", avg_expected, " days"
     )
 
     ggplot(d) +
@@ -458,7 +492,7 @@
                  size = 3) +
       scale_colour_manual(
         name = "Actual turnaround",
-        values = c("On-time (≤ Expected)" = "#10b981", "Delayed (> Expected)" = "#ef4444")
+        values = c("On-time (â‰¤ Expected)" = "#10b981", "Delayed (> Expected)" = "#ef4444")
       ) +
       scale_shape_manual(
         name = "Scenario standard",
@@ -574,7 +608,7 @@
     lines |>
       filter(abs(.data[[selected_currency]]) > 0) |>
       mutate(row_type = "Budget line",
-             plot_label = paste0(project_code, " · ", budget_line),
+             plot_label = paste0(project_code, " Â· ", budget_line),
              row_order = 1L) |>
       arrange(desc(.data[[selected_currency]]), budget_line) |>
       mutate(plot_label = factor(plot_label, levels = rev(unique(plot_label))))
@@ -612,10 +646,10 @@
           scale_y_continuous(labels = abbr, expand = expansion(mult = c(0, .3))) +
           labs(subtitle = if (nzchar(v(input$breakdown_project))) {
             paste("Non-zero budget lines for", v(input$breakdown_project),
-                  "—", tolower(status_label(status_value)), "in", currency)
+                  "â€”", tolower(status_label(status_value)), "in", currency)
           } else {
             paste("Projects with non-zero", tolower(status_label(status_value)),
-                  "amounts in", currency, "· select a project to see its budget lines")
+                  "amounts in", currency, "Â· select a project to see its budget lines")
           }, x = NULL, y = NULL) +
           chart_theme(fg) +
           theme(legend.position = "bottom", axis.text.y = element_text(size = 8.5),
@@ -718,6 +752,9 @@
     blank <- function(x) ifelse(is.na(x) | !nzchar(as.character(x)), "", as.character(x))
     reference <- if ("order_form" %in% names(d)) blank(d$order_form) else rep("", nrow(d))
     reference[!nzchar(reference)] <- paste0("REQ-", d$id[!nzchar(reference)])
+    overdue_flags <- calc_overdue_flags(d)
+    raw_status <- blank(d$status)
+    encoded_status <- ifelse(overdue_flags, paste0(raw_status, ":overdue"), raw_status)
     display <- data.frame(
       id = d$id,
       requested_by = blank(d$requested_by),
@@ -726,7 +763,7 @@
       project_code = blank(d$project_code),
       budget_line = blank(d$budget_line),
       amount = ifelse(is.na(d$amount), "", paste0(d$currency, " ", vapply(d$amount, money, character(1)))),
-      status = blank(d$status),
+      status = encoded_status,
       check.names = FALSE
     )
     names(display) <- c("id", "Requester", "Reference", "Description", "Project", "Budget line", "Amount", "Status")
@@ -749,9 +786,16 @@
                   list(targets = 7, width = "14%", orderable = FALSE, render = JS(r"---(
 function(data, type) {
   if (type !== 'display') return data;
+  var raw = String(data || '');
+  var isOverdue = raw.indexOf(':overdue') !== -1;
+  var key = raw.replace(':overdue', '');
   var labels = {under_review: 'Under review', pending: 'Pending', paid: 'Paid', cancelled: 'Cancelled'};
-  var key = String(data || '');
-  return '<span class="req-pill req-pill-' + key + '">' + (labels[key] || key) + '</span>';
+  var html = '<div class="req-status-cell"><span class="req-pill req-pill-' + key + '">&#8226; ' + (labels[key] || key) + '</span>';
+  if (isOverdue) {
+    html += '<div class="req-overdue-flag"><i class="far fa-clock"></i> Overdue</div>';
+  }
+  html += '</div>';
+  return html;
 }
 )---")),
                   list(targets = c(1, 4, 5, 6), className = "dt-body-left")
