@@ -561,7 +561,7 @@
       footer = div(
         class = "d-flex justify-content-between align-items-center w-100",
         modalButton(tagList(icon("arrow-left"), "Back")),
-        actionButton("btn_pay_confirm", tagList(icon("check"), "Confirm Paid"), class = "btn-primary", disabled = "disabled")
+        actionButton("btn_pay_confirm", tagList(icon("check"), "Confirm Paid"), class = "btn-primary", disabled = TRUE)
       )))
   })
 

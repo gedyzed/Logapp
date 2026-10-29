@@ -185,7 +185,7 @@ div.dataTables_wrapper div.dataTables_filter input:focus{border-color:var(--app-
 [data-bs-theme='dark'] .modal-footer .btn.btn-outline-danger:hover{background:rgba(220,38,38,.16)!important;color:#fecaca!important}
 .modal-dialog{width:auto!important;max-width:34rem!important;display:flex!important;align-items:center!important;justify-content:center!important;min-height:calc(100% - 3.5rem)!important;margin:1.75rem auto!important}
 .modal-dialog.modal-lg{width:min(1280px,calc(100vw - 1rem))!important;max-width:min(1280px,calc(100vw - 1rem))!important;margin:1.75rem auto!important}
-body.modal-open .requests-page,body.modal-open .dashboard-shell,body.modal-open .fin-page,body.modal-open .manage-layout,body.modal-open .navbar,body.modal-open .app-footer{filter:blur(4px) grayscale(15%)!important;pointer-events:none!important;user-select:none!important;transition:filter .2s ease}
+body.modal-open:has(.modal.show) .requests-page,body.modal-open:has(.modal.show) .dashboard-shell,body.modal-open:has(.modal.show) .fin-page,body.modal-open:has(.modal.show) .manage-layout,body.modal-open:has(.modal.show) .navbar,body.modal-open:has(.modal.show) .app-footer{filter:blur(4px) grayscale(15%)!important;pointer-events:none!important;user-select:none!important;transition:filter .2s ease}
 .modal-backdrop.show{opacity:.65!important;backdrop-filter:blur(5px)!important;-webkit-backdrop-filter:blur(5px)!important;background-color:rgba(15,23,42,.65)!important}
 #btn_pay_confirm:disabled{opacity:.45!important;cursor:not-allowed!important;pointer-events:none!important}
 .modal-body{overflow:visible;padding:.8rem 1rem .45rem}
@@ -480,7 +480,12 @@ $(document).on('shiny:connected', function() {
   Shiny.addCustomMessageHandler('cleanupModal', function(m) {
     $('.modal-backdrop').remove();
     $('body').removeClass('modal-open').css({'overflow': '', 'padding-right': ''});
+    $('.modal').modal('hide').removeClass('show');
     $('.modal:not(.show)').remove();
+    setTimeout(function() {
+      $('.modal-backdrop').remove();
+      $('body').removeClass('modal-open').css({'overflow': '', 'padding-right': ''});
+    }, 200);
   });
   Shiny.addCustomMessageHandler('mark', function(m) {
     $('.req-bad').removeClass('req-bad');
@@ -512,6 +517,11 @@ setInterval(function() {
     $('body').removeClass('modal-open').css({'overflow': '', 'padding-right': ''});
   }
 }, 250);
+$(document).on('shown.bs.modal', function() {
+  if ($('#pay_confirm').length) {
+    $('#btn_pay_confirm').prop('disabled', !$('#pay_confirm').is(':checked'));
+  }
+});
 $(document).on('change', '#pay_confirm', function() {
   $('#btn_pay_confirm').prop('disabled', !this.checked);
 });

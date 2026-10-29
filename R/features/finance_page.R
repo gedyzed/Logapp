@@ -316,7 +316,7 @@ finance_nav_panel <- function() {
                              tagList(icon("layer-group"), tags$span(class = "fin-batch-label", "Batch Selected")),
                              class = "btn-primary",
                              title = "Select a project first",
-                             disabled = NA)
+                             disabled = TRUE)
             )
         ),
         card(class = "fin-alloc-card", fill = FALSE,

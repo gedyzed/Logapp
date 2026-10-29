@@ -376,7 +376,7 @@ now <- function() format(Sys.time(), "%Y-%m-%d %H:%M:%OS3")
 fmt <- function(d) format(d, "%d-%m-%Y")
 v   <- function(x) if (is.null(x) || !length(x) || is.na(x)) "" else trimws(x)
 nz  <- function(x) if (nzchar(v(x))) v(x) else NA_character_
-has_date <- function(d) !is.null(d) && length(d) == 1 && !is.na(d)
+has_date <- function(d) !is.null(d) && length(d) == 1 && !is.na(d) && nzchar(trimws(as.character(d)))
 has_num  <- function(x) !is.null(x) && length(x) == 1 && !is.na(x)
 uniq <- function(x) { x <- as.character(x); sort(unique(x[!is.na(x) & nzchar(x)])) }
 with_sel <- function(ch, sel) { miss <- setdiff(sel, ch); c(ch, setNames(miss, miss)) }

@@ -510,6 +510,8 @@ observeEvent(input$fin_btn_confirm_proceed, {
     showNotification("Could not confirm the batch. Nothing was changed.", type = "error")
     return()
   }
+  if (exists("reload_expenses", mode = "function")) reload_expenses()
+  session$sendCustomMessage("cleanupModal", list())
   fin_history_tab("applied")
   showNotification(paste("Batch", code, "applied. The deduction is recorded."), type = "message")
 }, ignoreInit = TRUE)
