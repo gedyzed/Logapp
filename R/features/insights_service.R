@@ -790,10 +790,11 @@ function(data, type) {
   var isOverdue = raw.indexOf(':overdue') !== -1;
   var key = raw.replace(':overdue', '');
   var labels = {under_review: 'Under review', pending: 'Pending', paid: 'Paid', cancelled: 'Cancelled'};
-  var html = '<span class="req-pill req-pill-' + key + '">&#8226; ' + (labels[key] || key) + '</span>';
+  var html = '<div class="req-status-cell"><span class="req-pill req-pill-' + key + '">&#8226; ' + (labels[key] || key) + '</span>';
   if (isOverdue) {
-    html += '<div class="req-overdue-flag"><i class="fa fa-clock"></i> Overdue</div>';
+    html += '<div class="req-overdue-flag"><i class="far fa-clock"></i> Overdue</div>';
   }
+  html += '</div>';
   return html;
 }
 )---")),

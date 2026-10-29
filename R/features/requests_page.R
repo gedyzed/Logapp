@@ -11,7 +11,7 @@ ui <- function(request) {
     header = tagList(tags$style(css), tags$script(HTML(js))),
     footer = tags$footer(class = "app-footer",
                          tags$img(src = "acted-logo.png", class = "footer-logo", alt = "ACTED"),
-                         span(class = "footer-copy", paste("Logapp · Expense tracker ·", format(Sys.Date(), "%Y")))),
+                         span(class = "footer-copy", paste0("\u00a9 ", format(Sys.Date(), "%Y"), ". Log app. Expense tracker"))),
     
     # Requests: status cards span the page. Filters sit beside the register, as in the reference.
     nav_panel(
