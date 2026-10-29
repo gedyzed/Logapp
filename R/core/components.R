@@ -148,10 +148,16 @@ div.dataTables_wrapper div.dataTables_filter input:focus{border-color:var(--app-
 .form-section-title{font-weight:650;font-size:.95rem;margin:.65rem 0 .8rem}
 .form-section-rule{border-top:1px solid var(--app-border);margin:.5rem 0 1rem}
 .action-bar{position:sticky;bottom:0;z-index:5;display:flex;align-items:center;justify-content:flex-end;gap:.65rem;padding:.9rem 0 .1rem;margin-top:.5rem;background:var(--bs-body-bg);border-top:1px solid var(--app-border)}
-.modal-content{border:1px solid var(--app-border);border-radius:.8rem;background:var(--bs-body-bg);height:auto}
-.modal-header{border-color:var(--app-border);padding:.6rem 1rem}
+.modal-content{border:1px solid var(--app-border);border-radius:.8rem;background:var(--bs-body-bg);height:auto;overflow:hidden}
+.modal-header{background:#23313F!important;color:#ffffff!important;border-color:rgba(255,255,255,.12)!important;padding:.75rem 1.25rem;border-top-left-radius:.8rem;border-top-right-radius:.8rem}
+.modal-header .modal-title,.modal-header h4,.modal-header h5,.modal-header span,.modal-header div{color:#ffffff!important}
+.modal-header .btn-close{filter:invert(1) grayscale(100%) brightness(200%)!important}
 .modal-footer{border-color:var(--app-border);padding:.45rem .85rem;gap:.5rem}
 .modal-footer .btn{margin:0}
+.modal-footer .btn-default{background:transparent!important;border:1px solid var(--app-border)!important;color:var(--bs-body-color)!important;font-weight:500!important;padding:.38rem .85rem!important;border-radius:.5rem!important;display:inline-flex!important;align-items:center!important;gap:.4rem!important}
+.modal-footer .btn-default:hover,.modal-footer .btn-default:focus{background:var(--app-muted)!important;border-color:var(--app-muted-fg)!important;color:var(--bs-body-color)!important}
+[data-bs-theme='dark'] .modal-footer .btn-default{border-color:#71717a!important;color:#fafafa!important}
+[data-bs-theme='dark'] .modal-footer .btn-default:hover{background:#27272a!important;color:#ffffff!important}
 .modal-dialog{width:auto!important;max-width:34rem!important;margin:1.25rem auto;height:auto!important;min-height:0!important}
 .modal-dialog.modal-lg{width:min(1280px,calc(100vw - 1rem))!important;max-width:min(1280px,calc(100vw - 1rem))!important;margin:.4rem auto}
 .modal-body{overflow:visible;padding:.8rem 1rem .45rem}
@@ -232,6 +238,14 @@ table.dataTable tbody tr:hover>td{background:var(--app-muted)!important}
 [data-bs-theme='dark'] .dropdown-item:hover{background:#27272a!important;color:#ffffff!important}
 [data-bs-theme='dark'] .text-muted,[data-bs-theme='dark'] .muted{color:#d4d4d8!important}
 .btn-primary,.btn-primary:hover,.btn-primary:focus,.btn-primary:active{color:#ffffff!important}
+.btn-danger{--bs-btn-bg:#dc2626;--bs-btn-border-color:#dc2626;--bs-btn-hover-bg:#b91c1c;--bs-btn-hover-border-color:#b91c1c;font-weight:600;color:#fff!important}
+.btn-danger:hover,.btn-danger:focus,.btn-danger:active{color:#fff!important}
+.weekly-report-card{margin-bottom:1rem;max-width:100%;overflow:hidden}
+.weekly-report-card summary{list-style:none}
+.weekly-report-card summary::-webkit-details-marker{display:none}
+.weekly-report-card .card-body{overflow-x:auto}
+.weekly-report-card table.dataTable{width:100%!important;table-layout:fixed!important}
+.weekly-report-card table.dataTable th,.weekly-report-card table.dataTable td{white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
 
 /* Redesigned information architecture: persistent request filters, dashboard workspace, management pages. */
 .navbar .nav-link[data-value='requests'],.navbar .nav-link[data-value='dashboards'],.navbar .nav-link[data-value='financial_update'],.navbar .nav-link[data-value='manage']{font-weight:400!important;color:#fff!important}
@@ -423,9 +437,6 @@ $(document).on('shiny:connected', function() {
     var status = (m && m.status) ? m.status : '';
     $('.status-chip').removeClass('is-on');
     $('.status-chip[data-status=\"' + status + '\"]').addClass('is-on');
-    var control = $('#request-status-filter');
-    if (control.length) control.val(status).trigger('change');
-    else Shiny.setInputValue('table_status_filter', status, {priority: 'event'});
   });
   Shiny.addCustomMessageHandler('mark', function(m) {
     $('.req-bad').removeClass('req-bad');
@@ -574,6 +585,25 @@ function(settings, json) {
     var id = $(this).attr('data-id');
     if (!id) return;
     Shiny.setInputValue('open_request_row', {id: id, nonce: Math.random()}, {priority: 'event'});
+  });
+  $(table).off('click.expenseMore', 'a.dmore').on('click.expenseMore', 'a.dmore', function(e) {
+    e.preventDefault(); e.stopPropagation();
+    Shiny.setInputValue('see_more', {title: $(this).attr('data-title'), text: $(this).attr('data-full'), nonce: Math.random()}, {priority: 'event'});
+  });
+}
+)---")
+}
+
+# Weekly report table initialization: row clicks open read-only request details.
+weekly_table_init <- function() {
+  JS(r"---(
+function(settings, json) {
+  var table = this.api().table().node();
+  $(table).off('click.expenseWeekly', 'tbody tr').on('click.expenseWeekly', 'tbody tr', function(e) {
+    if ($(e.target).closest('a,button,input,select,label').length) return;
+    var id = $(this).attr('data-id');
+    if (!id) return;
+    Shiny.setInputValue('open_weekly_row', {id: id, nonce: Math.random()}, {priority: 'event'});
   });
   $(table).off('click.expenseMore', 'a.dmore').on('click.expenseMore', 'a.dmore', function(e) {
     e.preventDefault(); e.stopPropagation();

@@ -8,24 +8,25 @@
   person_edit_id <- reactiveVal(NULL)
   email_edit_id <- reactiveVal(NULL)
   
-  observeEvent(input$table_status_filter, {
-    request_table_status(v(input$table_status_filter))
-  }, ignoreInit = FALSE)
   set_request_status <- function(status = "") {
     status <- if (status %in% STATUS) status else ""
     request_table_status(status)
     session$sendCustomMessage("setTableStatus", list(status = status))
   }
+  toggle_request_status <- function(target_status) {
+    new_status <- if (identical(request_table_status(), target_status)) "" else target_status
+    set_request_status(new_status)
+  }
   observeEvent(input$card_status_all, set_request_status(""), ignoreInit = TRUE)
-  observeEvent(input$card_status_waiting, set_request_status("under_review"), ignoreInit = TRUE)
-  observeEvent(input$card_status_validation, set_request_status("pending"), ignoreInit = TRUE)
-  observeEvent(input$card_status_paid, set_request_status("paid"), ignoreInit = TRUE)
-  observeEvent(input$card_status_rejected, set_request_status("cancelled"), ignoreInit = TRUE)
+  observeEvent(input$card_status_waiting, toggle_request_status("under_review"), ignoreInit = TRUE)
+  observeEvent(input$card_status_validation, toggle_request_status("pending"), ignoreInit = TRUE)
+  observeEvent(input$card_status_paid, toggle_request_status("paid"), ignoreInit = TRUE)
+  observeEvent(input$card_status_rejected, toggle_request_status("cancelled"), ignoreInit = TRUE)
   observeEvent(input$chip_status_all, set_request_status(""), ignoreInit = TRUE)
-  observeEvent(input$chip_status_waiting, set_request_status("under_review"), ignoreInit = TRUE)
-  observeEvent(input$chip_status_validation, set_request_status("pending"), ignoreInit = TRUE)
-  observeEvent(input$chip_status_paid, set_request_status("paid"), ignoreInit = TRUE)
-  observeEvent(input$chip_status_rejected, set_request_status("cancelled"), ignoreInit = TRUE)
+  observeEvent(input$chip_status_waiting, toggle_request_status("under_review"), ignoreInit = TRUE)
+  observeEvent(input$chip_status_validation, toggle_request_status("pending"), ignoreInit = TRUE)
+  observeEvent(input$chip_status_paid, toggle_request_status("paid"), ignoreInit = TRUE)
+  observeEvent(input$chip_status_rejected, toggle_request_status("cancelled"), ignoreInit = TRUE)
   
   
   # ---- read live rows from the shared SQLite database ----
@@ -236,6 +237,23 @@
     d
   })
   filtered <- reactive(base())
+
+  # Weekly report: all requests registered from Monday of current week through today.
+  # The display window is today only (for testing; production: Friday afternoon).
+  weekly_data <- reactive({
+    d <- data()
+    today <- Sys.Date()
+    # Monday of current week
+    mon <- today - (as.integer(format(today, "%u")) - 1L)
+    reg_dates <- suppressWarnings(as.Date(substr(as.character(d$created), 1, 10)))
+    d[!is.na(reg_dates) & reg_dates >= mon & reg_dates <= today, , drop = FALSE]
+  })
+
+  weekly_window_active <- reactive({
+    # Show the weekly report banner today (testing mode).
+    # Production: only show on Fridays after 14:00 EAT.
+    TRUE
+  })
   
   # Dashboard period helpers. Request values/status counts follow order_date; actual paid spend follows payment_date.
   dashboard_period_bounds <- function(offset = 0L) {

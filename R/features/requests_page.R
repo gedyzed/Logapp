@@ -17,6 +17,7 @@ ui <- function(request) {
     nav_panel(
       title = "Requests", value = "requests",
       div(class = "requests-page",
+          uiOutput("weekly_report_banner"),
           div(class = "page-heading",
               div(h1("Requests"), p("Track, review and approve all organizational expenses in one place.")),
               div(class = "d-flex align-items-center gap-2",
@@ -323,29 +324,6 @@ ui <- function(request) {
       )
     ),
     
-    # Full-page request form; kept as a programmatically opened page.
-    nav_panel(
-      title = "New request", value = "new",
-      div(class = "page-shell",
-          div(class = "page-heading",
-              div(h1("New request"), p("Enter a procurement request. Fields without an asterisk are optional.")),
-              actionButton("cancel_new", tagList(icon("arrow-left"), "Back to requests"), class = "btn-outline-secondary")
-          ),
-          layout_columns(fill = FALSE, col_widths = c(8, 4),
-                         card(fill = FALSE,
-                              div(class = "card-body",
-                                  uiOutput("new_form_ui"),
-                                  div(class = "action-bar",
-                                      actionButton("clear", "Clear form", class = "btn-outline-secondary"),
-                                      actionButton("cancel_new_bottom", "Cancel", class = "btn-outline-secondary"),
-                                      actionButton("add", "Add request", class = "btn-primary")
-                                  )
-                              )
-                         ),
-                         card(card_header("Request preview"), div(class = "card-body", uiOutput("preview")))
-          )
-      )
-    ),
     nav_spacer(),
     nav_item(
       div(class = "d-flex align-items-center global-currency-wrap",
