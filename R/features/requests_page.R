@@ -11,7 +11,7 @@ ui <- function(request) {
     header = tagList(tags$style(css), tags$script(HTML(js))),
     footer = tags$footer(class = "app-footer",
                          tags$img(src = "acted-logo.png", class = "footer-logo", alt = "ACTED"),
-                         span("Logapp · Expense tracker")),
+                         span(class = "footer-copy", paste("Logapp · Expense tracker ·", format(Sys.Date(), "%Y")))),
     
     # Requests: status cards span the page. Filters sit beside the register, as in the reference.
     nav_panel(
@@ -302,19 +302,19 @@ ui <- function(request) {
                                )
                           )
                       ),
-                      div(class = "manage-two-col mt-3",
+                      div(class = "manage-defaults-row mt-3",
                           card(class = "manage-card", fill = FALSE,
                                card_header(tagList(icon("cog"), " Defaults")),
                                div(class = "card-body nr",
                                    p(class = "manage-note", "Defaults prefill future requests. Changing them does not rewrite existing records."),
                                    div(class = "fg",
-                                       col(12, selectizeInput("cfg_default_submitter", "Logistics focal point", choices = DEFAULTS$submitted_by,
-                                                              selected = DEFAULTS$submitted_by, width = "100%", options = list(create = TRUE, placeholder = "Type or choose a name"))),
-                                       col(12, selectizeInput("cfg_default_country", "Default country", choices = DEFAULTS$country,
-                                                              selected = DEFAULTS$country, width = "100%", options = list(create = TRUE, placeholder = "Type or choose a country"))),
-                                       col(12, selectInput("cfg_default_currency", "Default currency", choices = CUR,
+                                       col(4, selectizeInput("cfg_default_submitter", "Logistics focal point", choices = DEFAULTS$submitted_by,
+                                                             selected = DEFAULTS$submitted_by, width = "100%", options = list(create = TRUE, placeholder = "Type or choose a name"))),
+                                       col(4, selectizeInput("cfg_default_country", "Default country", choices = DEFAULTS$country,
+                                                             selected = DEFAULTS$country, width = "100%", options = list(create = TRUE, placeholder = "Type or choose a country"))),
+                                       col(4, selectInput("cfg_default_currency", "Default currency", choices = CUR,
                                                            selected = DEFAULTS$currency, width = "100%")),
-                                       col(12, div(class = "action-bar", actionButton("cfg_save_defaults", tagList(icon("save"), "Save defaults"), class = "btn-primary")))
+                                       col(12, div(class = "action-bar mt-2", actionButton("cfg_save_defaults", tagList(icon("save"), "Save defaults"), class = "btn-primary")))
                                    )
                                )
                           )
@@ -332,7 +332,7 @@ ui <- function(request) {
                       selected = DEFAULTS$currency, width = "8.6rem")
       )
     ),
-    nav_item(input_dark_mode(id = "mode")),
+    nav_item(input_dark_mode(id = "mode", mode = "light")),
     nav_item(actionButton("share_nav", NULL, icon = icon("share-square"),
                           class = "nav-icon-btn", title = "Share this view", `aria-label` = "Share this view")),
     nav_item(actionButton("settings_open", NULL, icon = icon("gear"),

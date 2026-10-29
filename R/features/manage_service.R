@@ -24,7 +24,10 @@
   # The gear icon now navigates to the full Manage workspace instead of opening a modal.
   observeEvent(input$settings_open, nav_select("nav", "manage", session = session))
   
+  manage_revision <- reactiveVal(0L)
+  
   project_catalog_view <- reactive({
+    manage_revision()
     invisible(data())
     db_get("SELECT p.id, p.project_code, COALESCE(p.department,'') AS department,
       COALESCE(p.location,'') AS location,
@@ -35,18 +38,21 @@
   })
   
   supplier_catalog_view <- reactive({
+    manage_revision()
     invisible(data())
     db_get("SELECT id, supplier_name, COALESCE(email,'') AS email, COALESCE(phone,'') AS phone,
                    active FROM suppliers ORDER BY supplier_name COLLATE NOCASE")
   })
   
   people_catalog_view <- reactive({
+    manage_revision()
     invisible(data())
     db_get("SELECT id, full_name, COALESCE(email,'') AS email, COALESCE(department,'') AS department,
                    active FROM people ORDER BY full_name COLLATE NOCASE")
   })
   
   notification_catalog_view <- reactive({
+    manage_revision()
     invisible(data())
     db_get("SELECT id, email, weekly_report, request_created, status_changed, active
             FROM notification_emails ORDER BY email COLLATE NOCASE")
@@ -126,6 +132,7 @@
     dbExecute(cn, "UPDATE projects SET project_code=?, department=?, location=?, updated=? WHERE id=?",
               params = list(code, if (nzchar(v(input$edit_project_department))) v(input$edit_project_department) else NA_character_,
                             if (nzchar(v(input$edit_project_location))) v(input$edit_project_location) else NA_character_, now(), as.integer(id)))
+    manage_revision(manage_revision() + 1L)
     project_edit_id(NULL); removeModal()
     showNotification("Project updated.", type = "message")
   })
@@ -147,6 +154,7 @@
     cn <- con(); on.exit(dbDisconnect(cn))
     dbExecute(cn, "UPDATE suppliers SET supplier_name=?,active=?,updated=? WHERE id=?",
               params = list(name, as.integer(isTRUE(input$edit_supplier_active)), now(), as.integer(id)))
+    manage_revision(manage_revision() + 1L)
     supplier_edit_id(NULL); removeModal()
     updateSelectizeInput(session, "supplier", choices = c("", supplier_catalog_db()), selected = if (isTRUE(input$edit_supplier_active)) name else "",
                          options = list(create = TRUE, placeholder = "Type or choose a supplier"))
@@ -172,6 +180,7 @@
     cn <- con(); on.exit(dbDisconnect(cn))
     dbExecute(cn, "UPDATE people SET full_name=?,department=?,active=?,updated=? WHERE id=?",
               params = list(name, if (nzchar(dept)) dept else NA_character_, as.integer(isTRUE(input$edit_person_active)), now(), as.integer(id)))
+    manage_revision(manage_revision() + 1L)
     person_edit_id(NULL); removeModal(); showNotification("Person updated. Historical request names were left unchanged.", type = "message")
   })
   
@@ -193,6 +202,7 @@
     cn <- con(); on.exit(dbDisconnect(cn))
     dbExecute(cn, "UPDATE notification_emails SET email=?,weekly_report=?,request_created=0,status_changed=0,active=?,updated=? WHERE id=?",
               params = list(email, as.integer(isTRUE(input$edit_notify_weekly)), as.integer(isTRUE(input$edit_notify_active)), now(), as.integer(id)))
+    manage_revision(manage_revision() + 1L)
     email_edit_id(NULL); removeModal(); showNotification("Notification recipient updated.", type = "message")
   })
   
@@ -209,6 +219,7 @@
     }
     cn <- con(); on.exit(dbDisconnect(cn))
     ensure_project_record(cn, code, v(input$cfg_project_department), "")
+    manage_revision(manage_revision() + 1L)
     updateTextInput(session, "cfg_project_code", value = "")
     codes <- project_codes_db()
     updateSelectInput(session, "cfg_budget_project",
@@ -247,6 +258,7 @@
     }
     cn <- con(); on.exit(dbDisconnect(cn))
     ensure_budget_line_record(cn, as.integer(p_row$id[[1]]), line)
+    manage_revision(manage_revision() + 1L)
     updateTextInput(session, "cfg_budget_line", value = "")
     if (identical(tolower(v(isolate(input$project_code))), tolower(code))) {
       lines <- budget_catalog_db(code)$budget_line_code
@@ -277,6 +289,7 @@
     }
     dbExecute(cn, "INSERT INTO suppliers(supplier_name,email,phone,active,created,updated) VALUES(?,?,?,?,?,?)",
               params = list(supplier_name, NA_character_, NA_character_, 1L, now(), now()))
+    manage_revision(manage_revision() + 1L)
     updateTextInput(session, "cfg_supplier_name", value = "")
     updateSelectizeInput(session, "supplier", choices = c("", supplier_catalog_db()), selected = supplier_name,
                          options = list(create = TRUE, placeholder = "Type or pick"))
@@ -299,6 +312,7 @@
     }
     dbExecute(cn, "INSERT INTO people(full_name,department,active,created,updated) VALUES(?,?,?,?,?)",
               params = list(full_name, if (nzchar(department)) department else NA_character_, 1L, now(), now()))
+    manage_revision(manage_revision() + 1L)
     updateTextInput(session, "cfg_person_name", value = "")
     updateSelectInput(session, "cfg_person_department", selected = "")
     showNotification(paste(full_name, "added to People."), type = "message")
@@ -317,6 +331,7 @@
         request_created=0,status_changed=0,
         active=excluded.active,updated=excluded.updated",
               params = list(email, as.integer(isTRUE(input$cfg_notify_weekly)), now(), now()))
+    manage_revision(manage_revision() + 1L)
     updateTextInput(session, "cfg_notify_email", value = "")
     updateCheckboxInput(session, "cfg_notify_weekly", value = TRUE)
     showNotification("Notification recipient saved.", type = "message")
@@ -346,6 +361,7 @@
       FALSE
     })
     if (!saved_defaults) return()
+    manage_revision(manage_revision() + 1L)
     DEFAULTS <<- read_app_defaults()
     showNotification("Request defaults saved to the database.", type = "message")
     # Apply the new defaults immediately to this session; future sessions also read them from SQLite.

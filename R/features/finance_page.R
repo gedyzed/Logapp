@@ -499,18 +499,22 @@ if (exists("input", inherits = FALSE) && exists("output", inherits = FALSE)) {
         if (identical(bucket, "applied")) {
           meta <- c(meta, list(span(class = "fin-meta-item", icon("circle-check"), paste0("Applied: ", card_date(r$confirmed_at[[1]])))))
         }
-        actions <- list(
-          tags$a(class = "btn btn-sm fin-export-btn",
-                 href = paste0(fin_export_base, "&batch=", URLencode(code, reserved = TRUE)),
-                 fin_excel_icon(), "Export Excel")
-        )
         if (identical(bucket, "active")) {
-          actions <- c(actions, list(
-            tags$button(type = "button", class = "btn btn-sm fin-reject-btn",
-                        `data-batch` = code, icon("ban"), " Reject"),
+          actions <- list(
             tags$button(type = "button", class = "btn btn-primary btn-sm fin-apply-btn",
-                        `data-batch` = code, icon("circle-check"), " Confirm Applied")
-          ))
+                        `data-batch` = code, icon("circle-check"), " Confirm Applied"),
+            tags$a(class = "btn btn-sm fin-export-btn",
+                   href = paste0(fin_export_base, "&batch=", URLencode(code, reserved = TRUE)),
+                   fin_excel_icon(), "Export Excel"),
+            tags$button(type = "button", class = "btn btn-sm fin-reject-btn",
+                        `data-batch` = code, icon("ban"), " Reject")
+          )
+        } else {
+          actions <- list(
+            tags$a(class = "btn btn-sm fin-export-btn",
+                   href = paste0(fin_export_base, "&batch=", URLencode(code, reserved = TRUE)),
+                   fin_excel_icon(), "Export Excel")
+          )
         }
         div(class = paste("fin-batch-card", paste0("is-", bucket)),
             div(class = "fin-batch-main",
@@ -597,9 +601,9 @@ if (exists("input", inherits = FALSE) && exists("output", inherits = FALSE)) {
     sheet <- do.call(rbind, lapply(names(grouped), function(key) {
       parts <- strsplit(key, "\u001f", fixed = TRUE)[[1]]
       data.frame(
-        `Batch Name` = fin_batch_label(pulled$batch),
         `Project Code` = parts[[1]],
         `Budget Line` = paste(parts[-1], collapse = "\u001f"),
+        Currency = "GBP",
         `Paid Amount` = round(abs(sum(grouped[[key]], na.rm = TRUE)) / 100, 2),
         check.names = FALSE,
         stringsAsFactors = FALSE

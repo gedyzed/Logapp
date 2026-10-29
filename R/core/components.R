@@ -313,6 +313,12 @@ table.dataTable tbody tr:hover>td{background:var(--app-muted)!important}
 .status-card-amount{margin-top:.35rem;font-weight:650;font-size:.95rem;letter-spacing:-.02em}
 .status-card-note{margin-top:.15rem;font-size:.75rem;color:var(--app-muted-fg);font-weight:600}
 .status-card.tone-paid .status-card-note{color:#16a34a}
+.status-overdue-pill{display:inline-flex;align-items:center;gap:.35rem;padding:.2rem .65rem;border-radius:1rem;font-size:.74rem;font-weight:650;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.35);color:#dc2626;margin-top:.4rem;line-height:1.2}
+.status-overdue-pill i,.status-overdue-pill svg{font-size:.76rem}
+[data-bs-theme='dark'] .status-overdue-pill{background:rgba(239,68,68,.18);border-color:rgba(239,68,68,.45);color:#f87171}
+.req-overdue-flag{display:flex;align-items:center;gap:.28rem;font-size:.74rem;font-weight:650;color:#dc2626;margin-top:.25rem;line-height:1}
+.req-overdue-flag i,.req-overdue-flag svg{font-size:.72rem}
+[data-bs-theme='dark'] .req-overdue-flag{color:#f87171}
 .req-pill{display:inline-flex;align-items:center;justify-content:center;min-width:6.4rem;font-size:.75rem;font-weight:650;padding:.32rem .7rem;border-radius:999px;white-space:nowrap}
 .req-pill-under_review{background:#e2e8f0;color:#334155}
 .req-pill-pending{background:#fef3c7;color:#b45309}
@@ -407,6 +413,7 @@ button.btn.metric-card.is-selected{box-shadow:inset 0 0 0 2px var(--app-accent)!
 .dashboard-metrics-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important}
 .manage-layout{max-width:1700px;margin:0 auto;padding:1.3rem clamp(1rem,2.2vw,2.5rem) 2rem}
 .manage-two-col{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem;align-items:start}
+.manage-defaults-row{display:grid;grid-template-columns:1fr;gap:1rem;align-items:start}
 .manage-card .card-body{padding:1rem}
 .defaults-card{position:sticky;top:1rem}
 .defaults-card .action-bar{position:static;margin-top:.8rem}
@@ -420,8 +427,10 @@ body.bslib-page-navbar>.container-fluid{flex:1 1 auto;display:flex;flex-directio
 body.bslib-page-navbar .tab-content{flex:1 1 auto;display:flex;flex-direction:column}
 body.bslib-page-navbar .tab-pane.active{flex:1 1 auto;display:flex;flex-direction:column}
 .page-shell,.dashboard-layout,.manage-layout{flex:1 1 auto}
-.app-footer{margin-top:auto;flex:0 0 auto;padding:.85rem 1.5rem;border-top:1px solid var(--app-border);background:var(--app-bg);color:var(--app-muted-fg);font-size:.78rem;width:100%;display:flex;align-items:center;justify-content:center;gap:.75rem}
+.app-footer{margin-top:auto;flex:0 0 auto;padding:.9rem 1.5rem;border-top:1px solid #1e293b;background:#1e293b!important;color:rgba(255,255,255,.82)!important;font-size:.82rem;width:100%;display:flex;align-items:center;justify-content:center;gap:1.5rem}
 .footer-logo{height:28px;width:auto;display:block}
+.footer-copy{font-weight:500;letter-spacing:.01em}
+[data-bs-theme='dark'] .app-footer{border-top:1px solid #182234;background:#0d1527!important;color:rgba(255,255,255,.75)!important}
 @media(max-width:1150px){.metrics-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.dashboard-metrics-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}.dashboard-lower-grid{grid-template-columns:1fr}}
 @media(max-width:860px){.request-status-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:992px){.dashboard-layout{grid-template-columns:1fr}.dashboard-sidebar{position:static;max-height:none;order:-1}}

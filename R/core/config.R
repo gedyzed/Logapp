@@ -95,6 +95,7 @@ SCEN_NAME <- c(
 )
 LEAD <- c(A = "< 1 week", B = "~2-3 weeks", C = "~2-3 weeks",
           D = "~1.5 months", E = "~2 months", G = "~2 months")
+SCENARIO_DAYS <- c(A = 7L, B = 14L, C = 21L, D = 45L, E = 60L, G = 60L)
 # Units per 1 USD. VERIFY these before real use. Each request stores its own rate.
 RATES <- c(ETB = 155, USD = 1, EUR = 0.92, GBP = 0.79)
 
