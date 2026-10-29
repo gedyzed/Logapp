@@ -1,6 +1,6 @@
 # Check dependencies up front so the R console reports actionable startup errors.
 required_packages <- c("shiny", "bslib", "DBI", "RSQLite", "DT", "dplyr",
-                       "writexl", "ggplot2", "scales")
+                       "writexl", "ggplot2", "scales", "shinymanager")
 missing_packages <- required_packages[
   !vapply(required_packages, requireNamespace, logical(1), quietly = TRUE)
 ]
@@ -27,6 +27,7 @@ library(DT)
 library(dplyr)
 library(writexl)
 library(ggplot2)
+library(shinymanager)
 
 needed_bslib_exports <- c("page_navbar", "nav_panel", "navset_tab", "card",
                           "card_header", "input_dark_mode")
@@ -85,6 +86,15 @@ CUR    <- c("ETB", "USD", "EUR", "GBP")
 STATUS <- c("under_review", "pending", "paid", "cancelled")
 DEPTS  <- c("REACH", "PANDA", "ACTED")
 
+
+# ---- Authentication credentials ----
+# Single shared credential for all authorized users
+AUTH_CREDENTIALS <- data.frame(
+  user = "acted",
+  password = "logapp",
+  admin = FALSE,
+  stringsAsFactors = FALSE
+)
 # values the new-request form starts with
 DEFAULTS <- list(submitted_by = "Betty T", currency = "ETB", country = "ETH")
 
