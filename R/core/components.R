@@ -336,7 +336,8 @@ table.dataTable tbody tr:hover>td{background:var(--app-muted)!important}
 .status-chip.btn.is-on{background:var(--app-accent)!important;border-color:var(--app-accent)!important;color:#fff!important}
 .sidebar-clear.btn{border:0!important;background:transparent!important;color:var(--app-accent)!important;font-weight:650;padding:.1rem .2rem!important;font-size:.82rem}
 .advanced-filters{margin-top:.35rem;border-top:1px solid var(--app-border);padding-top:.7rem}
-.advanced-filters summary{cursor:pointer;font-weight:650;font-size:.84rem;color:var(--app-accent);margin-bottom:.7rem}
+.advanced-filters summary{cursor:pointer;font-weight:650;font-size:.84rem;color:var(--app-accent);margin-bottom:.7rem;user-select:none;outline:none}
+.advanced-filters summary i,.advanced-filters summary svg{margin-left:.35rem;margin-right:.25rem}
 .filter-search{position:relative}
 .filter-search>.fa,.filter-search>svg,.filter-search .fa-magnifying-glass{position:absolute;left:.75rem;top:.65rem;z-index:2;pointer-events:none;color:var(--app-muted-fg);font-size:.8rem}
 .filter-search .form-control{padding-left:2.15rem}

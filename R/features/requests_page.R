@@ -174,14 +174,16 @@ ui <- function(request) {
                           selectizeInput("insights_project", NULL, choices = NULL, multiple = TRUE,
                                          width = "100%",
                                          options = list(placeholder = "All projects", plugins = list("remove_button"))),
-                         tags$label(class = "control-label mt-2", "Department"),
-                         selectInput("insights_department", NULL,
-                                     choices = c("All departments" = "", setNames(DEPTS, DEPTS)),
-                                     selected = "", width = "100%"),
-                         tags$label(class = "control-label", "Scenario"),
-                         selectInput("insights_scenario", NULL,
-                                     choices = c("All scenarios" = "", SCEN_NAME),
-                                     selected = "", width = "100%")
+                          tags$details(class = "advanced-filters mt-3",
+                                       tags$summary(tagList(icon("sliders"), " Advanced filters")),
+                                       tags$label(class = "control-label mt-2", "Department"),
+                                       selectInput("insights_department", NULL,
+                                                   choices = c("All departments" = "", setNames(DEPTS, DEPTS)),
+                                                   selected = "", width = "100%"),
+                                       tags$label(class = "control-label", "Scenario"),
+                                       selectInput("insights_scenario", NULL,
+                                                   choices = c("All scenarios" = "", SCEN_NAME),
+                                                   selected = "", width = "100%"))
                      )
           )
           )
