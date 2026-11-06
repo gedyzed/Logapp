@@ -311,9 +311,11 @@ table.dataTable tbody tr:hover>td{background:var(--app-muted)!important}
 .status-card.tone-pending{border-top:3px solid #f59e0b}
 .status-card.tone-paid{border-top:3px solid #16a34a}
 .status-card.tone-cancelled{border-top:3px solid #a1a1aa}
+.status-card.tone-days{border-top:3px solid #38bdf8}
 .status-card-amount{margin-top:.35rem;font-weight:650;font-size:.95rem;letter-spacing:-.02em}
 .status-card-note{margin-top:.15rem;font-size:.75rem;color:var(--app-muted-fg);font-weight:600}
 .status-card.tone-paid .status-card-note{color:#16a34a}
+.status-card .status-card-note-text{color:var(--app-muted-fg)}
 .status-overdue-pill{display:inline-flex;align-items:center;gap:.35rem;padding:.2rem .65rem;border-radius:1rem;font-size:.74rem;font-weight:650;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.35);color:#dc2626;margin-top:.4rem;line-height:1.2}
 .status-overdue-pill i,.status-overdue-pill svg{font-size:.76rem}
 [data-bs-theme='dark'] .status-overdue-pill{background:rgba(239,68,68,.18);border-color:rgba(239,68,68,.45);color:#f87171}
@@ -470,6 +472,9 @@ body.bslib-page-navbar .tab-pane.active{flex:1 1 auto;display:flex;flex-directio
 .card .dt-foot{margin-top:auto}
 body:not(.modal-open) .modal-backdrop{display:none!important;pointer-events:none!important}
 .insights-kpi-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.85rem}
+.insights-kpi-grid .status-card{display:block;width:100%;text-align:left}
+.insights-kpi-grid .status-card-value{font-size:clamp(1.2rem,1.5vw,1.65rem);line-height:1.15;white-space:nowrap;margin-top:.35rem}
+.insights-kpi-grid .status-card-note{display:flex;align-items:center;gap:.35rem;font-size:.8rem;margin-top:.45rem}
 .insights-kpi{background:var(--app-card-bg);border:1px solid var(--app-border);border-left:3.5px solid var(--app-accent);border-radius:var(--app-radius);padding:1rem 1.15rem 1.05rem}
 .insights-kpi-paid{border-left-color:#10b981}
 .insights-kpi-open{border-left-color:#f59e0b}

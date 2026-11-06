@@ -263,25 +263,39 @@
 
   insights_status_filter <- reactiveVal("")
 
-  observeEvent(input$insights_kpi_waiting, {
-    st <- if (identical(insights_status_filter(), "under_review")) "" else "under_review"
-    insights_status_filter(st)
-    updateSelectInput(session, "breakdown_status", selected = if (nzchar(st)) st else "paid")
-  })
-  observeEvent(input$insights_kpi_validation, {
-    st <- if (identical(insights_status_filter(), "pending")) "" else "pending"
-    insights_status_filter(st)
-    updateSelectInput(session, "breakdown_status", selected = if (nzchar(st)) st else "paid")
-  })
   observeEvent(input$insights_kpi_paid, {
-    st <- if (identical(insights_status_filter(), "paid")) "" else "paid"
-    insights_status_filter(st)
-    updateSelectInput(session, "breakdown_status", selected = if (nzchar(st)) st else "paid")
+    st <- insights_status_filter()
+    current_chart <- v(input$dash_chart_select)
+    if (identical(st, "paid") && !identical(current_chart, "days")) {
+      insights_status_filter("")
+    } else {
+      insights_status_filter("paid")
+      updateSelectInput(session, "breakdown_status", selected = "paid")
+      if (identical(current_chart, "days")) {
+        updateSelectInput(session, "dash_chart_select", selected = "spending")
+      }
+    }
   })
-  observeEvent(input$insights_kpi_rejected, {
-    st <- if (identical(insights_status_filter(), "cancelled")) "" else "cancelled"
-    insights_status_filter(st)
-    updateSelectInput(session, "breakdown_status", selected = if (nzchar(st)) st else "paid")
+
+  observeEvent(input$insights_kpi_open, {
+    st <- insights_status_filter()
+    current_chart <- v(input$dash_chart_select)
+    if ((identical(st, "pending") || identical(st, "under_review")) && !identical(current_chart, "days")) {
+      insights_status_filter("")
+    } else {
+      insights_status_filter("pending")
+      updateSelectInput(session, "breakdown_status", selected = "pending")
+      updateSelectInput(session, "dash_chart_select", selected = "breakdown")
+    }
+  })
+
+  observeEvent(input$insights_kpi_days, {
+    current_chart <- v(input$dash_chart_select)
+    if (identical(current_chart, "days")) {
+      updateSelectInput(session, "dash_chart_select", selected = "spending")
+    } else {
+      updateSelectInput(session, "dash_chart_select", selected = "days")
+    }
   })
 
   output$insights_footer <- renderUI({
@@ -307,56 +321,92 @@
 
   output$totals <- renderUI({
     q <- insights_query()
-    d <- data()
-    d_scoped <- insights_scope(d, q)
+    paid <- insights_paid_month(q$month)
+    prev <- insights_paid_month(shift_month(q$month, -1))
+    open_rows <- insights_open_month()
+    paid_amt <- sum_cur(paid)
+    prev_amt <- sum_cur(prev)
+    open_amt <- sum_cur(open_rows)
+    n_review <- if (!nrow(open_rows)) 0L else sum(open_rows$status == "under_review", na.rm = TRUE)
+    n_pending <- if (!nrow(open_rows)) 0L else sum(open_rows$status == "pending", na.rm = TRUE)
     cur <- active_currency()
-    selected_status <- insights_status_filter()
 
-    amount_of <- function(part) {
-      if (!nrow(part) || !cur %in% names(part)) return(0)
-      sum(suppressWarnings(as.numeric(part[[cur]])), na.rm = TRUE)
-    }
+    order_d <- suppressWarnings(as.Date(paid$order_date))
+    pay_d <- suppressWarnings(as.Date(paid$payment_date))
+    ok <- !is.na(order_d) & !is.na(pay_d)
+    actual <- as.numeric(pay_d[ok] - order_d[ok])
+    expected <- vapply(row_scenario(paid)[ok], function(s) {
+      if (s %in% names(SCENARIO_DAYS)) as.numeric(SCENARIO_DAYS[[s]]) else NA_real_
+    }, numeric(1))
+    mean_actual <- if (length(actual)) mean(actual) else NA_real_
+    mean_expected <- if (length(expected)) mean(expected, na.rm = TRUE) else NA_real_
 
-    in_month_paid <- insights_in_month(d_scoped[!is.na(d_scoped$status) & d_scoped$status == "paid", , drop = FALSE], "payment_date", q$month)
-    in_month_order <- insights_in_month(d_scoped[!is.na(d_scoped$status) & d_scoped$status != "paid", , drop = FALSE], "order_date", q$month)
-
-    part_review <- in_month_order[in_month_order$status == "under_review", , drop = FALSE]
-    part_pending <- in_month_order[in_month_order$status == "pending", , drop = FALSE]
-    part_paid <- in_month_paid
-    part_cancelled <- in_month_order[in_month_order$status == "cancelled", , drop = FALSE]
-
-    pending_overdue_count <- sum(calc_overdue_flags(part_pending))
-    pending_badge <- if (pending_overdue_count > 0) {
-      div(class = "status-overdue-pill", icon("circle-exclamation"), paste("Overdue:", pending_overdue_count))
+    if (nrow(paid) > 0) {
+      paid_display <- paste(cur, kpi_amount(paid_amt))
+      paid_note <- tagList(
+        span(class = "status-card-note-text", sprintf("%s paid requests \u00b7 ", format(nrow(paid), big.mark = ","))),
+        delta_ui(paid_amt, prev_amt)
+      )
     } else {
-      div(class = "status-card-note", "In progress")
+      paid_display <- "No data"
+      paid_note <- span(class = "status-card-note-text", "0 paid requests")
     }
 
-    paid_week <- 0L
-    if (nrow(part_paid) && "payment_date" %in% names(part_paid)) {
-      weeks <- format(suppressWarnings(as.Date(part_paid$payment_date)), "%G-W%V")
-      paid_week <- sum(!is.na(weeks) & weeks == format(Sys.Date(), "%G-W%V"))
+    if (nrow(open_rows) > 0) {
+      open_display <- paste(cur, kpi_amount(open_amt))
+      open_note <- span(class = "status-card-note-text",
+                        sprintf("%s under review \u00b7 %s pending",
+                                format(n_review, big.mark = ","),
+                                format(n_pending, big.mark = ",")))
+    } else {
+      open_display <- "No data"
+      open_note <- span(class = "status-card-note-text", "0 under review \u00b7 0 pending")
     }
 
-    make_card <- function(id, label, status, tone, icon_name, note, part, extra_bottom = NULL) {
-      actionButton(id,
-                   tagList(
-                     div(class = "status-card-top",
-                         span(class = "status-card-label", label),
-                         span(class = "status-card-icon", icon(icon_name))),
-                     div(class = "status-card-value", format(nrow(part), big.mark = ",")),
-                     div(class = "status-card-amount", paste(cur, money(amount_of(part)))),
-                     if (!is.null(extra_bottom)) extra_bottom else div(class = "status-card-note", note)
-                   ),
-                   class = paste("status-card", tone, if (identical(selected_status, status)) "is-active" else ""))
+    if (is.finite(mean_actual)) {
+      days_display <- sprintf("%.1f days", mean_actual)
+      days_note <- if (is.finite(mean_expected)) sprintf("vs %.0f expected", mean_expected) else "vs 18 expected"
+    } else {
+      days_display <- "No data"
+      days_note <- if (is.finite(mean_expected)) sprintf("vs %.0f expected", mean_expected) else "vs 18 expected"
     }
 
-    div(class = "request-status-grid",
-        make_card("insights_kpi_waiting", "Under review", "under_review", "tone-review", "magnifying-glass", "Awaiting review", part_review),
-        make_card("insights_kpi_validation", "Pending", "pending", "tone-pending", "clock", "In progress", part_pending, extra_bottom = pending_badge),
-        make_card("insights_kpi_paid", "Paid", "paid", "tone-paid", "circle-check",
-                  if (paid_week > 0) paste0("+", paid_week, " this week") else "Paid requests", part_paid),
-        make_card("insights_kpi_rejected", "Cancelled", "cancelled", "tone-cancelled", "circle-xmark", "Closed requests", part_cancelled))
+    st <- insights_status_filter()
+    current_chart <- v(input$dash_chart_select)
+
+    is_paid_active <- identical(st, "paid") && !identical(current_chart, "days")
+    is_open_active <- (identical(st, "pending") || identical(st, "under_review")) && !identical(current_chart, "days")
+    is_days_active <- identical(current_chart, "days")
+
+    div(class = "insights-kpi-grid",
+        actionButton("insights_kpi_paid",
+                     tagList(
+                       div(class = "status-card-top",
+                           span(class = "status-card-label", "Paid spend"),
+                           span(class = "status-card-icon", icon("circle-check"))),
+                       div(class = "status-card-value", paid_display),
+                       div(class = "status-card-note", paid_note)
+                     ),
+                     class = paste("status-card tone-paid", if (is_paid_active) "is-active" else "")),
+        actionButton("insights_kpi_open",
+                     tagList(
+                       div(class = "status-card-top",
+                           span(class = "status-card-label", "Open requests"),
+                           span(class = "status-card-icon", icon("clock"))),
+                       div(class = "status-card-value", open_display),
+                       div(class = "status-card-note", open_note)
+                     ),
+                     class = paste("status-card tone-pending", if (is_open_active) "is-active" else "")),
+        actionButton("insights_kpi_days",
+                     tagList(
+                       div(class = "status-card-top",
+                           span(class = "status-card-label", "Avg days to pay"),
+                           span(class = "status-card-icon", icon("calendar-check"))),
+                       div(class = "status-card-value", days_display),
+                       div(class = "status-card-note", days_note)
+                     ),
+                     class = paste("status-card tone-days", if (is_days_active) "is-active" else ""))
+    )
   })
 
   output$insights_spend_title <- renderUI({
