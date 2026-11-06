@@ -751,7 +751,8 @@
     df$period <- factor(df$period, levels = period_levels)
     df$year <- factor(df$year, levels = years)
 
-    palette <- c("#0ea5e9", "#f1f5f9", "#64748b", "#94a3b8")
+    is_dark <- identical(input$mode, "dark")
+    palette <- if (is_dark) c("#38bdf8", "#94a3b8", "#64748b", "#cbd5e1") else c("#0284c7", "#94a3b8", "#64748b", "#cbd5e1")
     newest_first <- rev(years)
     fills <- setNames(palette[seq_along(newest_first)], newest_first)
 
@@ -764,7 +765,7 @@
         axis.text.y = element_blank(),
         axis.ticks.y = element_blank(),
         axis.ticks.x = element_blank(),
-        axis.text.x = element_text(colour = "#94a3b8", size = 11, margin = margin(t = 4)),
+        axis.text.x = element_text(colour = if (is_dark) "#94a3b8" else "#64748b", size = 11, margin = margin(t = 4)),
         panel.grid.major.y = element_blank(),
         panel.grid.minor.y = element_blank(),
         panel.grid.major.x = element_blank(),
@@ -773,7 +774,7 @@
         legend.justification = "left",
         legend.direction = "horizontal",
         legend.title = element_blank(),
-        legend.text = element_text(colour = "#e2e8f0", size = 10, face = "bold"),
+        legend.text = element_text(colour = fg, size = 10, face = "bold"),
         legend.key.size = unit(0.7, "lines"),
         plot.margin = margin(4, 12, 0, 4)
       )

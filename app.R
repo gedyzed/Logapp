@@ -275,27 +275,6 @@ server <- function(input, output, session) {
     }
   })
   
-  # Add logout button to navbar - insert after settings button
-  observeEvent(auth_result$user, {
-    if (!is.null(auth_result$user) && nzchar(auth_result$user)) {
-      # Insert after the settings button
-      insertUI(
-        selector = "#settings_open",
-        where = "afterEnd",
-        ui = actionButton(
-          "logout_btn",
-          NULL,
-          icon = icon("right-from-bracket"),
-          class = "nav-icon-btn",
-          title = "Logout",
-          `aria-label` = "Logout",
-          style = "color: #dc2626; background-color: rgba(220, 38, 38, 0.1); border-radius: 6px; padding: 0.5rem; margin-left: 0.5rem; transition: all 0.2s ease;"
-        ),
-        immediate = TRUE
-      )
-    }
-  }, once = TRUE)
-  
   # Handle logout - reload session to show login page
   observeEvent(input$logout_btn, {
     # Clear authentication and reload
