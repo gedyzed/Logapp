@@ -303,7 +303,8 @@ table.dataTable tbody tr:hover>td{background:var(--app-muted)!important}
 .request-status-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.75rem;margin:0 0 1rem}
 .status-card{display:block;width:100%;min-width:0;text-align:left;padding:.9rem 1rem .85rem;border:1px solid var(--app-border)!important;border-radius:.75rem;background:var(--app-card-bg)!important;color:var(--bs-body-color)!important;white-space:normal;box-shadow:0 1px 2px rgba(15,23,42,.04)}
 .status-card:hover,.status-card:focus{border-color:var(--app-accent)!important;color:var(--bs-body-color)!important}
-.status-card.is-active{border-color:var(--app-accent)!important;box-shadow:0 0 0 2px rgba(2,132,199,.18)}
+.status-card.is-active{border-color:var(--app-accent)!important;box-shadow:0 0 0 2px rgba(2,132,199,.35)!important}
+[data-bs-theme='dark'] .status-card.is-active{border-color:#38bdf8!important;box-shadow:0 0 0 2px rgba(56,189,248,.4)!important}
 .status-card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:.5rem}
 .status-card-icon{width:1.85rem;height:1.85rem;border-radius:.5rem;display:inline-flex;align-items:center;justify-content:center;background:var(--app-muted);color:var(--app-muted-fg);flex:0 0 auto}
 .status-card.tone-review{border-top:3px solid #94a3b8}

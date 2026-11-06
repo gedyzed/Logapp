@@ -178,18 +178,14 @@ ui <- function(request) {
                                             options = list(placeholder = "Search projects", plugins = list("remove_button")))
                          ),
                          uiOutput("insights_project_chips"),
-                         tags$details(class = "insights-advanced",
-                                      tags$summary(uiOutput("insights_advanced_label", inline = TRUE)),
-                                      tags$label(class = "control-label", "Department"),
-                                      selectInput("insights_department", NULL,
-                                                  choices = c("All departments" = "", setNames(DEPTS, DEPTS)),
-                                                  selected = "", width = "100%"),
-                                      tags$label(class = "control-label", "Scenario"),
-                                      selectInput("insights_scenario", NULL,
-                                                  choices = c("All scenarios" = "", SCEN_NAME),
-                                                  selected = "", width = "100%")
-                         ),
-                         actionButton("insights_apply", "Show results", class = "btn btn-primary w-100")
+                         tags$label(class = "control-label mt-2", "Department"),
+                         selectInput("insights_department", NULL,
+                                     choices = c("All departments" = "", setNames(DEPTS, DEPTS)),
+                                     selected = "", width = "100%"),
+                         tags$label(class = "control-label", "Scenario"),
+                         selectInput("insights_scenario", NULL,
+                                     choices = c("All scenarios" = "", SCEN_NAME),
+                                     selected = "", width = "100%")
                      )
           )
           )

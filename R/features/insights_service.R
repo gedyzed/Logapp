@@ -224,14 +224,24 @@
                       selected = month_sel)
   })
 
-  observeEvent(input$insights_apply, {
+  observe({
+    mo <- v(input$insights_month)
+    if (!nzchar(mo)) mo <- format(Sys.Date(), "%Y-%m")
     projects <- input$insights_project
     if (is.null(projects)) projects <- character()
-    insights_commit(v(input$insights_month), projects,
-                    v(input$insights_department), v(input$insights_scenario))
-    insights_drill_code("")
-    insights_days_all(FALSE)
-  }, ignoreInit = TRUE)
+    dept <- v(input$insights_department) %||% ""
+    scen <- v(input$insights_scenario) %||% ""
+
+    current <- isolate(insights_query())
+    if (!identical(current$month, mo) ||
+        !identical(sort(current$projects), sort(as.character(projects))) ||
+        !identical(current$department, as.character(dept)) ||
+        !identical(current$scenario, as.character(scen))) {
+      insights_commit(mo, projects, dept, scen)
+      insights_drill_code("")
+      insights_days_all(FALSE)
+    }
+  })
 
   observeEvent(insights_query(), {
     insights_days_all(FALSE)
@@ -264,17 +274,44 @@
     }
   })
 
+  insights_status_filter <- reactiveVal("")
+
+  observeEvent(input$insights_kpi_waiting, {
+    st <- if (identical(insights_status_filter(), "under_review")) "" else "under_review"
+    insights_status_filter(st)
+    updateSelectInput(session, "breakdown_status", selected = if (nzchar(st)) st else "paid")
+  })
+  observeEvent(input$insights_kpi_validation, {
+    st <- if (identical(insights_status_filter(), "pending")) "" else "pending"
+    insights_status_filter(st)
+    updateSelectInput(session, "breakdown_status", selected = if (nzchar(st)) st else "paid")
+  })
+  observeEvent(input$insights_kpi_paid, {
+    st <- if (identical(insights_status_filter(), "paid")) "" else "paid"
+    insights_status_filter(st)
+    updateSelectInput(session, "breakdown_status", selected = if (nzchar(st)) st else "paid")
+  })
+  observeEvent(input$insights_kpi_rejected, {
+    st <- if (identical(insights_status_filter(), "cancelled")) "" else "cancelled"
+    insights_status_filter(st)
+    updateSelectInput(session, "breakdown_status", selected = if (nzchar(st)) st else "paid")
+  })
+
   output$insights_footer <- renderUI({
     q <- insights_query()
     dept <- if (nzchar(q$department %||% "")) q$department else "All departments"
     proj <- if (length(q$projects)) paste(q$projects, collapse = ", ") else "All projects"
-    kind <- "Paid"
-    if (identical(v(input$dash_chart_select), "breakdown")) {
-      kind <- switch(v(input$breakdown_status),
-                     pending = "Pending",
-                     under_review = "Under review",
-                     cancelled = "Cancelled",
-                     "Paid")
+    st <- insights_status_filter()
+    kind <- if (nzchar(st)) {
+      switch(st, under_review = "Under review", pending = "Pending", cancelled = "Cancelled", "Paid")
+    } else if (identical(v(input$dash_chart_select), "breakdown")) {
+      switch(v(input$breakdown_status),
+             pending = "Pending",
+             under_review = "Under review",
+             cancelled = "Cancelled",
+             "Paid")
+    } else {
+      "Paid"
     }
     div(class = "insights-footer",
         icon("code-branch", class = "insights-footer-icon"),
@@ -283,56 +320,56 @@
 
   output$totals <- renderUI({
     q <- insights_query()
-    paid <- insights_paid_month(q$month)
-    prev <- insights_paid_month(shift_month(q$month, -1))
-    open_rows <- insights_open_month()
-    paid_amt <- sum_cur(paid)
-    prev_amt <- sum_cur(prev)
-    open_amt <- sum_cur(open_rows)
-    n_review <- if (!nrow(open_rows)) 0L else sum(open_rows$status == "under_review", na.rm = TRUE)
-    n_pending <- if (!nrow(open_rows)) 0L else sum(open_rows$status == "pending", na.rm = TRUE)
+    d <- data()
+    d_scoped <- insights_scope(d, q)
     cur <- active_currency()
+    selected_status <- insights_status_filter()
 
-    order_d <- suppressWarnings(as.Date(paid$order_date))
-    pay_d <- suppressWarnings(as.Date(paid$payment_date))
-    ok <- !is.na(order_d) & !is.na(pay_d)
-    actual <- as.numeric(pay_d[ok] - order_d[ok])
-    expected <- vapply(row_scenario(paid)[ok], function(s) {
-      if (s %in% names(SCENARIO_DAYS)) as.numeric(SCENARIO_DAYS[[s]]) else NA_real_
-    }, numeric(1))
-    mean_actual <- if (length(actual)) mean(actual) else NA_real_
-    mean_expected <- if (length(expected)) mean(expected, na.rm = TRUE) else NA_real_
-    days_value <- if (is.finite(mean_actual)) sprintf("%.1f days", mean_actual) else "20.8 days"
-    days_note <- if (is.finite(mean_expected)) sprintf("vs %.0f expected", mean_expected) else "vs 18 expected"
+    amount_of <- function(part) {
+      if (!nrow(part) || !cur %in% names(part)) return(0)
+      sum(suppressWarnings(as.numeric(part[[cur]])), na.rm = TRUE)
+    }
 
-    paid_display <- if (paid_amt > 0) paste(cur, kpi_amount(paid_amt)) else paste(cur, "1,240,000")
-    open_display <- if (open_amt > 0) paste(cur, kpi_amount(open_amt)) else paste(cur, "860,000")
-    paid_count <- if (nrow(paid) > 0) nrow(paid) else 12L
-    rev_count <- if (nrow(open_rows) > 0) n_review else 5L
-    pend_count <- if (nrow(open_rows) > 0) n_pending else 7L
+    in_month_paid <- insights_in_month(d_scoped[!is.na(d_scoped$status) & d_scoped$status == "paid", , drop = FALSE], "payment_date", q$month)
+    in_month_order <- insights_in_month(d_scoped[!is.na(d_scoped$status) & d_scoped$status != "paid", , drop = FALSE], "order_date", q$month)
 
-    div(class = "insights-kpi-grid",
-        div(class = "insights-kpi insights-kpi-paid",
-            div(class = "insights-kpi-label", "Paid spend"),
-            div(class = "insights-kpi-value", paid_display),
-            div(class = "insights-kpi-sub",
-                span(class = "insights-kpi-sub-text", sprintf("%s paid requests \u00b7 ", format(paid_count, big.mark = ","))),
-                delta_ui(paid_amt, prev_amt))
-        ),
-        div(class = "insights-kpi insights-kpi-open",
-            div(class = "insights-kpi-label", "Open requests"),
-            div(class = "insights-kpi-value", open_display),
-            div(class = "insights-kpi-sub",
-                sprintf("%s under review \u00b7 %s pending",
-                        format(rev_count, big.mark = ","),
-                        format(pend_count, big.mark = ",")))
-        ),
-        div(class = "insights-kpi insights-kpi-days",
-            div(class = "insights-kpi-label", "Avg days to pay"),
-            div(class = "insights-kpi-value", days_value),
-            div(class = "insights-kpi-sub", days_note)
-        )
-    )
+    part_review <- in_month_order[in_month_order$status == "under_review", , drop = FALSE]
+    part_pending <- in_month_order[in_month_order$status == "pending", , drop = FALSE]
+    part_paid <- in_month_paid
+    part_cancelled <- in_month_order[in_month_order$status == "cancelled", , drop = FALSE]
+
+    pending_overdue_count <- sum(calc_overdue_flags(part_pending))
+    pending_badge <- if (pending_overdue_count > 0) {
+      div(class = "status-overdue-pill", icon("circle-exclamation"), paste("Overdue:", pending_overdue_count))
+    } else {
+      div(class = "status-card-note", "In progress")
+    }
+
+    paid_week <- 0L
+    if (nrow(part_paid) && "payment_date" %in% names(part_paid)) {
+      weeks <- format(suppressWarnings(as.Date(part_paid$payment_date)), "%G-W%V")
+      paid_week <- sum(!is.na(weeks) & weeks == format(Sys.Date(), "%G-W%V"))
+    }
+
+    make_card <- function(id, label, status, tone, icon_name, note, part, extra_bottom = NULL) {
+      actionButton(id,
+                   tagList(
+                     div(class = "status-card-top",
+                         span(class = "status-card-label", label),
+                         span(class = "status-card-icon", icon(icon_name))),
+                     div(class = "status-card-value", format(nrow(part), big.mark = ",")),
+                     div(class = "status-card-amount", paste(cur, money(amount_of(part)))),
+                     if (!is.null(extra_bottom)) extra_bottom else div(class = "status-card-note", note)
+                   ),
+                   class = paste("status-card", tone, if (identical(selected_status, status)) "is-active" else ""))
+    }
+
+    div(class = "request-status-grid",
+        make_card("insights_kpi_waiting", "Under review", "under_review", "tone-review", "magnifying-glass", "Awaiting review", part_review),
+        make_card("insights_kpi_validation", "Pending", "pending", "tone-pending", "clock", "In progress", part_pending, extra_bottom = pending_badge),
+        make_card("insights_kpi_paid", "Paid", "paid", "tone-paid", "circle-check",
+                  if (paid_week > 0) paste0("+", paid_week, " this week") else "Paid requests", part_paid),
+        make_card("insights_kpi_rejected", "Cancelled", "cancelled", "tone-cancelled", "circle-xmark", "Closed requests", part_cancelled))
   })
 
   output$insights_spend_title <- renderUI({
@@ -345,6 +382,16 @@
     q <- insights_query()
     d <- insights_paid_month(q$month)
     cur <- active_currency()
+    fg <- fg_col()
+
+    amt_total <- if (nrow(d) && cur %in% names(d)) sum(suppressWarnings(as.numeric(d[[cur]])), na.rm = TRUE) else 0
+    if (amt_total <= 0) {
+      return(ggplot() +
+               annotate("text", x = 0.5, y = 0.5, label = "No data", colour = fg, size = 5.5, fontface = "bold") +
+               theme_void() +
+               theme(plot.background = element_rect(fill = "transparent", colour = NA)))
+    }
+
     weeks <- paste("Week", 1:5)
     totals <- setNames(rep(0, 5), weeks)
     if (nrow(d) && "payment_date" %in% names(d)) {
@@ -360,7 +407,6 @@
     }
     mode <- v(input$insights_spend_mode)
     shown <- if (identical(mode, "cumulative")) cumsum(totals) else totals
-    fg <- fg_col()
     df <- data.frame(week = factor(weeks, levels = weeks), amount = as.numeric(shown))
     ggplot(df, aes(week, amount)) +
       geom_col(fill = bar_col(), width = 0.62) +
@@ -371,7 +417,7 @@
 
   breakdown_base <- reactive({
     q <- insights_query()
-    status <- v(input$breakdown_status)
+    status <- if (nzchar(insights_status_filter())) insights_status_filter() else v(input$breakdown_status)
     if (!status %in% STATUS) status <- "paid"
     d <- data()
     d <- d[!is.na(d$status) & d$status == status, , drop = FALSE]
@@ -431,7 +477,7 @@
   output$insights_breakdown <- renderUI({
     df <- breakdown_plot_df()
     q <- insights_query()
-    status <- v(input$breakdown_status)
+    status <- if (nzchar(insights_status_filter())) insights_status_filter() else v(input$breakdown_status)
     if (!status %in% STATUS) status <- "paid"
     drill <- insights_drill_code()
     status_word <- switch(status,
@@ -446,26 +492,29 @@
                          "is-paid")
     subject <- if (nzchar(drill)) "budget line" else "project"
     
-    if (!nrow(df)) {
-      df <- data.frame(
-        label = c("MHPSS-26", "EDU-AMH-25", "ETH-EDU-26", "FIELD-OPS-26", "Other (5)"),
-        total = c(680000, 575000, 484000, 306000, 0),
-        share = c(33, 28, 24, 15, 0),
-        stringsAsFactors = FALSE
-      )
-      peak <- 680000
-      total_amt <- 2045000
-      count_label <- "4 projects"
-    } else {
-      named <- df[df$label != "Other", , drop = FALSE]
-      total_amt <- sum(df$total)
-      count_label <- if (nzchar(drill)) sprintf("%d budget lines", nrow(df)) else sprintf("%d projects", nrow(named))
-      peak <- max(df$total)
+    if (!nrow(df) || sum(df$total, na.rm = TRUE) == 0) {
+      return(tagList(
+        if (nzchar(drill))
+          actionButton("insights_drill_back", "Back to projects",
+                       icon = icon("arrow-left"),
+                       class = "btn btn-outline-secondary btn-sm insights-back"),
+        div(class = "insights-line-head",
+            div(class = "insights-plot-title",
+                paste0(status_word, " by ", subject, " \u00b7 ", month_label(q$month)),
+                span(class = "insights-info-icon", title = "Breakdown info", "\u24d8"))
+        ),
+        div(class = "insights-empty", "No data")
+      ))
     }
+
+    named <- df[df$label != "Other", , drop = FALSE]
+    total_amt <- sum(df$total)
+    count_label <- if (nzchar(drill)) sprintf("%d budget lines", as.integer(nrow(df))) else sprintf("%d projects", as.integer(nrow(named)))
+    peak <- max(df$total)
 
     rows <- lapply(seq_len(nrow(df)), function(i) {
       lab <- df$label[[i]]
-      clickable <- !nzchar(drill) && !lab %in% c("Other", "(No project)", "Other (5)")
+      clickable <- !nzchar(drill) && !lab %in% c("Other", "(No project)")
       safe <- gsub("'", "\\'", lab, fixed = TRUE)
       width <- if (!is.finite(peak) || peak <= 0) 0 else round(100 * df$total[[i]] / peak)
       is_other <- grepl("^Other", lab)
@@ -473,7 +522,7 @@
         span(class = "insights-line-name", lab),
         span(class = "insights-line-track",
              span(class = paste("insights-line-fill", fill_class),
-                  style = sprintf("width:%d%%", if (is_other) 0 else max(0, min(100, width))))),
+                  style = sprintf("width:%.0f%%", if (is_other) 0 else max(0, min(100, as.numeric(width)))))),
         span(class = "insights-line-meta",
              paste(abbr(df$total[[i]]), sprintf("%.0f%%", df$share[[i]]), sep = " \u00b7 "),
              if (clickable) span(class = "insights-line-chevron", "\u203a"))
@@ -511,65 +560,55 @@
     ok <- !is.na(order_d) & !is.na(pay_d)
     
     if (!any(ok)) {
-      n <- 4L
-      n_on <- 2L
-      avg_actual <- 20.8
-      avg_delay <- 2.0
-      sample_items <- list(
-        list(ref = "PO-0412", late = TRUE, delta = "+10 days", pct = 80),
-        list(ref = "PO-0398", late = TRUE, delta = "+6 days", pct = 50),
-        list(ref = "PO-0401", late = FALSE, delta = "-4 days", pct = 40),
-        list(ref = "PO-0387", late = FALSE, delta = "7 days", pct = 65)
-      )
-      rows <- lapply(sample_items, function(r) {
-        div(class = "insights-day-row",
-            div(class = "insights-day-ref",
-                span(r$ref),
-                span(class = "insights-day-ref-sep", "|")),
-            div(class = "insights-day-track",
-                div(class = paste("insights-day-fill", if (r$late) "is-late" else "is-ok"),
-                    style = sprintf("width: %d%%;", max(5, min(48, r$pct / 2))))),
-            span(class = paste("insights-day-delta", if (r$late) "is-late" else "is-ok"), r$delta))
-      })
-    } else {
-      part <- d[ok, , drop = FALSE]
-      actual <- as.numeric(pay_d[ok] - order_d[ok])
-      scen <- row_scenario(part)
-      expected <- vapply(scen, function(s) {
-        if (s %in% names(SCENARIO_DAYS)) as.numeric(SCENARIO_DAYS[[s]]) else NA_real_
-      }, numeric(1))
-      on_time <- !is.na(expected) & actual <= expected
-      n <- length(actual)
-      n_on <- sum(on_time)
-      delay <- actual - expected
-      avg_actual <- mean(actual)
-      avg_delay <- mean(delay, na.rm = TRUE)
-      ref <- as.character(part$project_code)
-      missing_code <- is.na(ref) | !nzchar(ref)
-      ref[missing_code] <- paste0("REQ-", part$id[missing_code])
-      order_idx <- order(pay_d[ok], part$id, decreasing = TRUE)
-      show_n <- if (isTRUE(insights_days_all()) || n <= 4) n else 4L
-      shown <- order_idx[seq_len(show_n)]
-      rows <- lapply(shown, function(i) {
-        late <- is.na(expected[i]) || expected[i] <= 0 || actual[i] > expected[i]
-        width <- if (is.na(expected[i]) || expected[i] <= 0) 75 else round(48 * actual[i] / expected[i])
-        delta_txt <- if (is.na(expected[i])) "\u2014" else sprintf("%+.0f days", actual[i] - expected[i])
-        div(class = "insights-day-row",
-            div(class = "insights-day-ref",
-                span(title = ref[i], ref[i]),
-                span(class = "insights-day-ref-sep", "|")),
-            div(class = "insights-day-track",
-                div(class = paste("insights-day-fill", if (late) "is-late" else "is-ok"),
-                    style = sprintf("width:%d%%", max(4, min(48, width))))),
-            span(class = paste("insights-day-delta", if (late) "is-late" else "is-ok"), delta_txt))
-      })
+      return(tagList(
+        div(class = "insights-line-head",
+            div(class = "insights-plot-title",
+                "Completion time by request",
+                span(class = "insights-info-icon", title = "Completion time info", "\u24d8"))
+        ),
+        div(class = "insights-empty", "No data")
+      ))
     }
+
+    part <- d[ok, , drop = FALSE]
+    actual <- as.numeric(pay_d[ok] - order_d[ok])
+    scen <- row_scenario(part)
+    expected <- vapply(scen, function(s) {
+      if (s %in% names(SCENARIO_DAYS)) as.numeric(SCENARIO_DAYS[[s]]) else NA_real_
+    }, numeric(1))
+    on_time <- !is.na(expected) & actual <= expected
+    n <- length(actual)
+    n_on <- sum(on_time)
+    delay <- actual - expected
+    avg_actual <- mean(actual)
+    avg_delay <- mean(delay, na.rm = TRUE)
+    ref <- as.character(part$project_code)
+    missing_code <- is.na(ref) | !nzchar(ref)
+    ref[missing_code] <- paste0("REQ-", part$id[missing_code])
+    order_idx <- order(pay_d[ok], part$id, decreasing = TRUE)
+    show_n <- if (isTRUE(insights_days_all()) || n <= 4) n else 4L
+    shown <- order_idx[seq_len(show_n)]
+    rows <- lapply(shown, function(i) {
+      late <- is.na(expected[i]) || expected[i] <= 0 || actual[i] > expected[i]
+      width <- if (is.na(expected[i]) || expected[i] <= 0) 75 else round(48 * actual[i] / expected[i])
+      delta_txt <- if (is.na(expected[i])) "\u2014" else sprintf("%+.0f days", actual[i] - expected[i])
+      div(class = "insights-day-row",
+          div(class = "insights-day-ref",
+              span(title = ref[i], ref[i]),
+              span(class = "insights-day-ref-sep", "|")),
+          div(class = "insights-day-track",
+              div(class = paste("insights-day-fill", if (late) "is-late" else "is-ok"),
+                  style = sprintf("width:%.0f%%", max(4, min(48, as.numeric(width)))))),
+          span(class = paste("insights-day-delta", if (late) "is-late" else "is-ok"), delta_txt))
+    })
+
+    pct_on <- if (n > 0) round(100 * n_on / n) else 0
 
     tagList(
       div(class = "insights-day-stats",
           div(class = "insights-day-stat",
               span("On time"),
-              tags$b(sprintf("%d of %d (%d%%)", n_on, n, round(100 * n_on / n)))
+              tags$b(sprintf("%d of %d (%.0f%%)", as.integer(n_on), as.integer(n), as.numeric(pct_on)))
           ),
           div(class = "insights-day-stat",
               span("Avg actual"),
@@ -577,20 +616,21 @@
           ),
           div(class = "insights-day-stat",
               span("Avg delay"),
-              tags$b(if (is.finite(avg_delay)) sprintf("%+.1f days", avg_delay) else "+2.0 days")
+              tags$b(if (is.finite(avg_delay)) sprintf("%+.1f days", avg_delay) else "\u2014")
           )
       ),
       div(class = "insights-line-head",
           div(class = "insights-plot-title",
               "Completion time by request",
               span(class = "insights-info-icon", title = "Completion time info", "\u24d8")),
-          span(class = "insights-line-summary", sprintf("%d requests", n))
+          span(class = "insights-line-summary", sprintf("%d requests", as.integer(n)))
       ),
       div(class = "insights-day-center-label", span("On schedule")),
       div(class = "insights-day-rows", rows),
-      tags$a(href = "#", id = "insights_days_show_all", class = "insights-show-all",
-             onclick = "Shiny.setInputValue('insights_days_all_btn', Math.random()); return false;",
-             paste0("Show all (24) \u2192"))
+      if (n > 4 && !isTRUE(insights_days_all()))
+        tags$a(href = "#", id = "insights_days_show_all", class = "insights-show-all",
+               onclick = "Shiny.setInputValue('insights_days_all_btn', Math.random()); return false;",
+               sprintf("Show all (%d) \u2192", as.integer(n)))
     )
   })
 
@@ -614,14 +654,32 @@
 
   output$insights_compare_title <- renderUI({
     by_month <- !identical(v(input$insights_compare_mode), "quarter")
-    base <- if (by_month) "Paid spend by month \u00b7 2025 vs 2026" else "Paid spend by quarter \u00b7 2025 vs 2026"
+    frame <- comparison_frame()
+    years <- frame$years
+    base <- if (by_month) "Paid spend by month" else "Paid spend by quarter"
+    title_text <- if (length(years) >= 2) paste(base, paste(rev(tail(years, 2)), collapse = " vs "), sep = " \u00b7 ") else base
     span(class = "insights-plot-title",
-         base,
+         title_text,
          span(class = "insights-info-icon", title = "Comparison info", "\u24d8"))
   })
 
   output$insights_compare_delta <- renderUI({
-    span(class = "insights-compare-delta", "\u25b2 18% vs 2025 (to date)")
+    frame <- comparison_frame()
+    years <- frame$years
+    if (length(years) < 2) return(NULL)
+    newest <- years[length(years)]
+    prior <- years[length(years) - 1]
+    cutoff <- suppressWarnings(as.integer(substr(frame$month, 6, 7)))
+    if (is.na(cutoff)) cutoff <- 12L
+    month_num <- as.integer(format(frame$dates, "%m"))
+    year_num <- format(frame$dates, "%Y")
+    current <- sum(frame$amount[year_num == newest & month_num <= cutoff], na.rm = TRUE)
+    previous <- sum(frame$amount[year_num == prior & month_num <= cutoff], na.rm = TRUE)
+    if (!is.finite(previous) || previous <= 0 || !is.finite(current)) return(NULL)
+    pct <- (current - previous) / abs(previous) * 100
+    up <- pct >= 0
+    span(class = "insights-compare-delta",
+         sprintf("%s %.0f%% vs %s (to date)", if (up) "\u25b2" else "\u25bc", abs(pct), prior))
   })
 
   output$plot_comparison <- renderPlot({
@@ -629,56 +687,40 @@
     fg <- fg_col()
     by_month <- !identical(v(input$insights_compare_mode), "quarter")
     
-    has_live_comp <- length(frame$years) >= 2 && all(c("2025", "2026") %in% frame$years)
-    
-    if (has_live_comp) {
-      years <- c("2026", "2025")
-      period_levels <- if (by_month) month.abb else paste0("Q", 1:4)
-      rows <- lapply(years, function(yr) {
-        in_year <- format(frame$dates, "%Y") == yr
-        month_num <- as.integer(format(frame$dates[in_year], "%m"))
-        if (by_month) {
-          bucket <- factor(month_num, levels = 1:12)
-          labels <- month.abb
-        } else {
-          bucket <- factor(((month_num - 1L) %/% 3L) + 1L, levels = 1:4)
-          labels <- paste0("Q", 1:4)
-        }
-        summed <- as.numeric(tapply(frame$amount[in_year], bucket, sum))
-        summed[is.na(summed)] <- 0
-        data.frame(period = labels, year = yr, amount = summed, stringsAsFactors = FALSE)
-      })
-      df <- do.call(rbind, rows)
-      df$period <- factor(df$period, levels = period_levels)
-      df$year <- factor(df$year, levels = c("2026", "2025"))
-    } else {
-      if (by_month) {
-        labels <- c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
-        val_2026 <- c(1100, 850, 1350, 950, 1250, 750, 1150, 1450, 850, 1200, 1550, 650) * 1000
-        val_2025 <- c(820, 710, 1080, 790, 1050, 620, 940, 1180, 700, 980, 1220, 520) * 1000
-        df <- rbind(
-          data.frame(period = labels, year = "2026", amount = val_2026, stringsAsFactors = FALSE),
-          data.frame(period = labels, year = "2025", amount = val_2025, stringsAsFactors = FALSE)
-        )
-        df$period <- factor(df$period, levels = labels)
-        df$year <- factor(df$year, levels = c("2026", "2025"))
-      } else {
-        labels <- c("Q1", "Q2", "Q3", "Q4")
-        val_2026 <- c(3300, 2950, 3450, 2400) * 1000
-        val_2025 <- c(2610, 2460, 2820, 1720) * 1000
-        df <- rbind(
-          data.frame(period = labels, year = "2026", amount = val_2026, stringsAsFactors = FALSE),
-          data.frame(period = labels, year = "2025", amount = val_2025, stringsAsFactors = FALSE)
-        )
-        df$period <- factor(df$period, levels = labels)
-        df$year <- factor(df$year, levels = c("2026", "2025"))
-      }
+    if (length(frame$dates) == 0 || sum(frame$amount, na.rm = TRUE) == 0) {
+      return(ggplot() +
+               annotate("text", x = 0.5, y = 0.5, label = "No data", colour = fg, size = 5.5, fontface = "bold") +
+               theme_void() +
+               theme(plot.background = element_rect(fill = "transparent", colour = NA)))
     }
 
-    fills <- c("2026" = "#0ea5e9", "2025" = "#f1f5f9")
+    years <- tail(frame$years, 2)
+    period_levels <- if (by_month) month.abb else paste0("Q", 1:4)
+    rows <- lapply(years, function(yr) {
+      in_year <- format(frame$dates, "%Y") == yr
+      month_num <- as.integer(format(frame$dates[in_year], "%m"))
+      if (by_month) {
+        bucket <- factor(month_num, levels = 1:12)
+        labels <- month.abb
+      } else {
+        bucket <- factor(((month_num - 1L) %/% 3L) + 1L, levels = 1:4)
+        labels <- paste0("Q", 1:4)
+      }
+      summed <- as.numeric(tapply(frame$amount[in_year], bucket, sum))
+      summed[is.na(summed)] <- 0
+      data.frame(period = labels, year = yr, amount = summed, stringsAsFactors = FALSE)
+    })
+    df <- do.call(rbind, rows)
+    df$period <- factor(df$period, levels = period_levels)
+    df$year <- factor(df$year, levels = years)
+
+    palette <- c("#0ea5e9", "#f1f5f9", "#64748b", "#94a3b8")
+    newest_first <- rev(years)
+    fills <- setNames(palette[seq_along(newest_first)], newest_first)
+
     ggplot(df, aes(period, amount, fill = year)) +
       geom_col(position = position_dodge(width = 0.72), width = 0.65) +
-      scale_fill_manual(values = fills, breaks = c("2026", "2025")) +
+      scale_fill_manual(values = fills, breaks = rev(newest_first)) +
       scale_y_continuous(labels = function(x) abbr(x), expand = expansion(mult = c(0, 0.08))) +
       chart_theme(fg) +
       theme(
