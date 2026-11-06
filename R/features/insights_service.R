@@ -215,7 +215,7 @@
                  paste(sort(months), collapse = "\n"), month_sel, sep = "\f")
     if (identical(sig, isolate(insights_choice_sig()))) return()
     insights_choice_sig(sig)
-    updateSelectizeInput(session, "insights_project", choices = codes, selected = sel, server = TRUE)
+    updateSelectizeInput(session, "insights_project", choices = codes, selected = sel, server = TRUE, options = list(placeholder = "All projects"))
     updateSelectInput(session, "insights_department",
                       choices = c("All departments" = "", setNames(deps, deps)),
                       selected = dep_sel)
@@ -259,20 +259,7 @@
     span(sprintf("Advanced filters (%d)", n))
   })
 
-  output$insights_project_chips <- renderUI({
-    sel <- input$insights_project
-    if (length(sel)) {
-      tagList(lapply(sel, function(p) {
-        tags$span(class = "insights-chip", p,
-                  tags$button(type = "button", class = "insights-chip-remove",
-                              onclick = sprintf("var s = $('#insights_project')[0].selectize; s.removeItem('%s');", p),
-                              "\u2715"))
-      }))
-    } else {
-      tags$span(class = "insights-chip", "All projects",
-                tags$button(type = "button", class = "insights-chip-remove", "\u2715"))
-    }
-  })
+  output$insights_project_chips <- renderUI(NULL)
 
   insights_status_filter <- reactiveVal("")
 

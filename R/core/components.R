@@ -526,6 +526,8 @@ body:not(.modal-open) .modal-backdrop{display:none!important;pointer-events:none
 @media(max-width:860px){
   .insights-sidebar .sidebar-close-btn{display:inline-flex}
 }
+#insights_project + .selectize-control .selectize-input{background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2216%22 height=%2216%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%2394a3b8%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22><circle cx=%2211%22 cy=%2211%22 r=%228%22></circle><line x1=%2221%22 y1=%2221%22 x2=%2216.65%22 y2=%2216.65%22></line></svg>')!important;background-repeat:no-repeat!important;background-position:0.75rem center!important;padding-left:2.25rem!important;border-radius:.45rem!important;min-height:2.45rem!important;display:flex!important;align-items:center!important;flex-wrap:wrap!important;gap:4px!important}
+#insights_project + .selectize-control .selectize-input input{padding-left:0!important}
 .insights-chips{display:flex;flex-wrap:wrap;gap:.35rem;margin:-.2rem 0 .75rem}
 .insights-chip{display:inline-flex;align-items:center;gap:.4rem;padding:.2rem .65rem;border-radius:999px;background:#1e293b;border:1px solid #334155;color:#e2e8f0;font-size:.78rem;font-weight:600}
 .insights-chip-remove{background:none;border:none;color:#94a3b8;padding:0;cursor:pointer;line-height:1;font-size:.82rem}
