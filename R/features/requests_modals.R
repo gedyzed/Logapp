@@ -253,16 +253,29 @@
     if (identical(q[["v"]], "dash")) {
       nav_select("nav", "dashboards", session = session)
       if (!is.null(q[["cur"]])) updateSelectInput(session, "global_cur", selected = q[["cur"]])
-      if (!is.null(q[["period"]])) updateSelectInput(session, "dash_period_type", selected = q[["period"]])
-      if (!is.null(q[["yr"]])) updateSelectInput(session, "dash_year", selected = q[["yr"]])
-      if (!is.null(q[["m"]])) updateSelectInput(session, "dash_month", selected = q[["m"]])
-      if (!is.null(q[["q"]])) updateSelectInput(session, "dash_quarter", selected = q[["q"]])
-      if (!is.null(q[["p"]])) updateSelectizeInput(session, "dash_project", selected = vals("p"))
-      if (!is.null(q[["d"]])) updateSelectizeInput(session, "dash_department", selected = vals("d"))
-      if (!is.null(q[["chart"]])) updateSelectInput(session, "dash_chart_select", selected = q[["chart"]])
+      chart <- q[["chart"]]
+      if (!is.null(chart) && chart %in% c("year_compare", "quarter_compare")) {
+        updateRadioButtons(session, "insights_compare_mode",
+                           selected = if (identical(chart, "quarter_compare")) "quarter" else "month")
+        chart <- "comparison"
+      }
+      if (!is.null(chart) && nzchar(chart)) updateSelectInput(session, "dash_chart_select", selected = chart)
+      if (!is.null(q[["smode"]])) updateRadioButtons(session, "insights_spend_mode", selected = q[["smode"]])
+      if (!is.null(q[["cmode"]])) updateRadioButtons(session, "insights_compare_mode", selected = q[["cmode"]])
       if (!is.null(q[["bstat"]])) updateSelectInput(session, "breakdown_status", selected = q[["bstat"]])
-      if (!is.null(q[["bdim"]])) updateSelectInput(session, "dim", selected = q[["bdim"]])
-      if (!is.null(q[["bp"]])) updateSelectInput(session, "breakdown_project", selected = q[["bp"]])
+      month <- if (!is.null(q[["mo"]]) && nzchar(q[["mo"]])) q[["mo"]] else NULL
+      projects <- if (!is.null(q[["p"]])) vals("p") else NULL
+      dept <- if (!is.null(q[["d"]]) && !grepl("|", q[["d"]], fixed = TRUE)) q[["d"]] else NULL
+      scen <- if (!is.null(q[["sc"]])) q[["sc"]] else NULL
+      if (!is.null(month)) updateSelectInput(session, "insights_month", selected = month)
+      if (!is.null(projects)) updateSelectizeInput(session, "insights_project", selected = projects)
+      if (!is.null(dept)) updateSelectInput(session, "insights_department", selected = dept)
+      if (!is.null(scen)) updateSelectInput(session, "insights_scenario", selected = scen)
+      if (!is.null(month) && exists("insights_commit", mode = "function")) {
+        insights_commit(month, if (is.null(projects)) character() else projects,
+                        if (is.null(dept)) "" else dept,
+                        if (is.null(scen)) "" else scen)
+      }
       return()
     }
     if (!(q[["v"]] %in% c("r", "r2"))) return()

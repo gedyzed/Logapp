@@ -120,11 +120,11 @@ DIMS <- c(Project = "project_code", Requester = "requested_by",
 
 month_choices <- function(month_values = NULL) {
   if (is.null(month_values)) {
-    month_values <- format(seq(as.Date(format(Sys.Date(), "%Y-%m-01")),
-                               by = "-1 month", length.out = 24), "%Y-%m")
+    yr <- format(Sys.Date(), "%Y")
+    month_values <- sprintf("%s-%02d", yr, 1:12)
   }
   month_values <- sort(unique(as.character(month_values[!is.na(month_values) & nzchar(month_values)])),
-                       decreasing = TRUE)
+                       decreasing = FALSE)
   if (!length(month_values)) return(character())
   setNames(month_values, format(as.Date(paste0(month_values, "-01")), "%B %Y"))
 }
