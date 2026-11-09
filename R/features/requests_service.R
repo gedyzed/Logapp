@@ -85,7 +85,7 @@
       d[[k]] <- as.numeric(ifelse(d$currency %in% k, d$amount,
                                   round(usd * RATES[[k]], 2)))
     d$scenario      <- scenario(usd, d$waiver)
-    date_value <- suppressWarnings(as.Date(d$order_date))
+    date_value <- safe_date(d$order_date)
     d$week          <- format(date_value, "%G-W%V")
     d$month         <- format(date_value, "%Y-%m")
     d$year          <- format(date_value, "%Y")
@@ -99,7 +99,10 @@
     if (nzchar(v(selected_month))) d <- d[d$month == selected_month, , drop = FALSE]
     if (!nrow(d)) return(character())
     summary <- d |> group_by(week) |>
-      summarise(first = min(as.Date(order_date)), .groups = "drop") |>
+      summarise(first = {
+        parsed <- safe_date(order_date)
+        if (!any(!is.na(parsed))) as.Date(NA) else min(parsed, na.rm = TRUE)
+      }, .groups = "drop") |>
       arrange(desc(week))
     monday <- summary$first - (as.integer(format(summary$first, "%u")) - 1L)
     setNames(summary$week, paste0(summary$week, " (from ", format(monday, "%d %b"), ")"))
@@ -113,6 +116,35 @@
     if (!nrow(catalog)) return(character())
     setNames(as.character(catalog$id), paste0(catalog$project_code, " — ", catalog$budget_line_code))
   }
+
+  # Skip an input update when choices and selection are already what we last sent.
+  # Clear all otherwise echoes "" / character(0) back into this observer forever.
+  filter_sent <- new.env(parent = emptyenv())
+  push_input <- function(id, choices, selected, selectize = TRUE, server = NULL, options = NULL) {
+    choice_vals <- as.character(unname(choices %||% character()))
+    choice_labs <- names(choices)
+    if (is.null(choice_labs)) choice_labs <- choice_vals
+    sel <- as.character(selected %||% character())
+    sel <- sel[!is.na(sel)]
+    placeholder <- if (is.list(options) && !is.null(options$placeholder)) as.character(options$placeholder) else ""
+    sig <- paste(
+      paste(choice_vals, as.character(choice_labs), sep = "=", collapse = "\u001f"),
+      paste(sel, collapse = "\u001f"),
+      placeholder,
+      sep = "\u001e"
+    )
+    if (identical(filter_sent[[id]], sig)) return(invisible(FALSE))
+    filter_sent[[id]] <- sig
+    if (isTRUE(selectize)) {
+      args <- list(session = session, inputId = id, choices = choices, selected = selected)
+      if (!is.null(server)) args$server <- server
+      if (!is.null(options)) args$options <- options
+      do.call(updateSelectizeInput, args)
+    } else {
+      updateSelectInput(session, id, choices = choices, selected = selected)
+    }
+    invisible(TRUE)
+  }
   
   # Populate filters from the database. Month constrains Week; selecting a project
   # constrains Budget line to that project's configured mappings.
@@ -122,24 +154,32 @@
       x <- isolate(input[[id]])
       if (is.null(x)) character() else as.character(x)
     }
-    current_month <- format(Sys.Date(), "%Y-%m")
-    available_months <- unique(c(d$month, current_month))
-    month_selected <- isolate(input$f_month) %||% current_month
-    updateSelectInput(session, "f_month",
-                      choices = c("All months" = "", month_choices(available_months)),
-                      selected = month_selected)
+    prev_mo <- last_month()
+    current_month <- format(app_today(), "%Y-%m")
+    available_months <- unique(c(d$month, prev_mo, current_month))
+    month_selected <- isolate(input$f_month) %||% prev_mo
+    if (identical(month_selected, "__none__")) month_selected <- ""
+    month_opts <- month_choices(available_months)
+    push_input("f_month",
+               choices = filter_named(unname(month_opts), names(month_opts), "All months"),
+               selected = month_selected, server = FALSE,
+               options = list(dropdownParent = "body", allowEmptyOption = TRUE))
     # Project choices come from the projects table, including newly configured projects
     # that do not yet have an expense record.
     project_choices <- project_codes_db()
     project_selected <- intersect(keep("f_project"), project_choices)
-    updateSelectizeInput(session, "f_project", choices = project_choices,
-                         selected = project_selected)
-    updateSelectInput(session, "cfg_budget_project",
-                      choices = c("Select project" = "", setNames(project_choices, project_choices)),
-                      selected = v(isolate(input$cfg_budget_project)))
+    project_selected <- project_selected[project_selected != "__none__"]
+    push_input("f_project",
+               choices = if (length(project_choices)) project_choices else c("No options found" = "__none__"),
+               selected = project_selected, server = FALSE,
+               options = list(placeholder = if (length(project_choices)) "All projects" else "No options found",
+                              dropdownParent = "body"))
+    push_input("cfg_budget_project",
+               choices = c("Select project" = "", setNames(project_choices, project_choices)),
+               selected = v(isolate(input$cfg_budget_project)), selectize = FALSE)
     department_choices <- uniq(c(DEPTS, d$department))
-    updateSelectizeInput(session, "dash_department", choices = department_choices,
-                         selected = intersect(keep("dash_department"), department_choices))
+    push_input("dash_department", choices = department_choices,
+               selected = intersect(keep("dash_department"), department_choices))
 
     # Dynamic cascading: if department(s) are selected in dashboard, restrict dash_project choices
     selected_dash_dept <- if (is.null(input$dash_department)) character() else as.character(input$dash_department)
@@ -157,35 +197,60 @@
     }
 
     dash_project_selected <- intersect(keep("dash_project"), dash_project_choices)
-    updateSelectizeInput(session, "dash_project", choices = dash_project_choices,
-                         selected = dash_project_selected)
+    push_input("dash_project", choices = dash_project_choices, selected = dash_project_selected)
     years <- sort(unique(c(d$year,
                            format(suppressWarnings(as.Date(d$payment_date)), "%Y"),
-                           format(Sys.Date(), "%Y"))), decreasing = TRUE)
+                           format(app_today(), "%Y"))), decreasing = TRUE)
     years <- years[!is.na(years) & nzchar(years)]
-    updateSelectInput(session, "dash_year", choices = setNames(years, years),
-                      selected = isolate(input$dash_year) %||% format(Sys.Date(), "%Y"))
-    updateSelectizeInput(session, "f_person", choices = uniq(d$requested_by),
-                         selected = keep("f_person"))
-    updateSelectizeInput(session, "f_submitter", choices = uniq(d$submitted_by),
-                         selected = keep("f_submitter"))
+    push_input("dash_year", choices = setNames(years, years),
+               selected = isolate(input$dash_year) %||% format(app_today(), "%Y"),
+               selectize = FALSE)
+    person_choices <- uniq(d$requested_by)
+    submitter_choices <- uniq(d$submitted_by)
+    push_input("f_person",
+               choices = if (length(person_choices)) person_choices else c("No options found" = "__none__"),
+               selected = intersect(keep("f_person"), person_choices), server = FALSE,
+               options = list(placeholder = if (length(person_choices)) "All requesters" else "No options found",
+                              dropdownParent = "body"))
+    push_input("f_submitter",
+               choices = if (length(submitter_choices)) submitter_choices else c("No options found" = "__none__"),
+               selected = intersect(keep("f_submitter"), submitter_choices), server = FALSE,
+               options = list(placeholder = if (length(submitter_choices)) "All focal points" else "No options found",
+                              dropdownParent = "body"))
     
     # Keep these as reactive reads so the dependent choices refresh when the user changes them.
     project_selection <- if (is.null(input$f_project)) character() else as.character(input$f_project)
+    project_selection <- project_selection[!is.na(project_selection) & nzchar(project_selection) & project_selection != "__none__"]
     selected_month <- input$f_month %||% ""
+    if (identical(selected_month, "__none__")) selected_month <- ""
     bchoices <- budget_filter_choices(project_selection)
     budget_selected <- intersect(keep("f_budget_line"), unname(bchoices))
-    updateSelectizeInput(session, "f_budget_line", choices = bchoices,
-                         selected = budget_selected,
-                         options = list(placeholder = if (length(project_selection))
-                           "Choose budget line(s) for selected project(s)" else "Select project code(s) first"))
+    budget_locked <- !length(project_selection)
+    budget_placeholder <- if (budget_locked) {
+      "Select project code(s) first"
+    } else if (!length(bchoices)) {
+      "No options found"
+    } else {
+      "All lines"
+    }
+    push_input("f_budget_line",
+               choices = if (length(bchoices)) bchoices else if (!budget_locked) c("No options found" = "__none__") else character(),
+               selected = budget_selected, server = FALSE,
+               options = list(placeholder = budget_placeholder, dropdownParent = "body"))
+    lock_sig <- paste(budget_locked, budget_placeholder, sep = "\u001e")
+    if (!identical(filter_sent[["filterLock"]], lock_sig)) {
+      filter_sent[["filterLock"]] <- lock_sig
+      session$sendCustomMessage("filterLock", list(
+        id = "f_budget_line", locked = budget_locked, placeholder = budget_placeholder
+      ))
+    }
     
     # Request breakdown uses a separate, database-backed project selector when
     # Group by = Project. Without a selected project, show project totals only;
     # selecting one project reveals its total followed by its budget lines.
     current_dim <- isolate(input$dim) %||% "project_code"
     if (!(current_dim %in% unname(DIMS))) current_dim <- "project_code"
-    updateSelectInput(session, "dim", choices = DIMS, selected = current_dim)
+    push_input("dim", choices = DIMS, selected = current_dim, selectize = FALSE)
     
     breakdown_projects <- if (length(selected_dash_dept)) dash_project_choices else project_codes_db()
     if (length(dash_project_selected)) {
@@ -198,14 +263,17 @@
     } else {
       breakdown_project_selected <- breakdown_project_selected[[1]]
     }
-    updateSelectInput(session, "breakdown_project",
-                      choices = c("Select a project" = "", breakdown_projects),
-                      selected = breakdown_project_selected)
+    push_input("breakdown_project",
+               choices = c("Select a project" = "", breakdown_projects),
+               selected = breakdown_project_selected, selectize = FALSE)
     
     wchoices <- week_choices(d, selected_month)
     week_selected <- intersect(keep("f_week"), unname(wchoices))
-    updateSelectizeInput(session, "f_week", choices = wchoices, selected = week_selected,
-                         options = list(placeholder = "All weeks in selected month"))
+    push_input("f_week",
+               choices = if (length(wchoices)) wchoices else c("No options found" = "__none__"),
+               selected = week_selected, server = FALSE,
+               options = list(placeholder = if (length(wchoices)) "All weeks" else "No options found",
+                              dropdownParent = "body"))
   })
 
   active_currency <- function() {
@@ -213,11 +281,21 @@
     if (is.null(c_val) || !nzchar(c_val) || !c_val %in% CUR) "ETB" else c_val
   }
 
+  # Tables show the selected currency only. amount and currency stay as stored.
+  selected_amount_label <- function(d) {
+    cur <- active_currency()
+    n <- if (is.data.frame(d)) nrow(d) else 0L
+    if (!n) return(character())
+    vals <- if (cur %in% names(d)) suppressWarnings(as.numeric(d[[cur]])) else rep(NA_real_, n)
+    ifelse(is.na(vals), "", paste(cur, vapply(vals, money, character(1))))
+  }
+
   observeEvent(input$reset_dash_filter, {
+    prev_mo_date <- as.Date(format(app_today(), "%Y-%m-01")) - 1L
     updateSelectInput(session, "dash_period_type", selected = "month")
-    updateSelectInput(session, "dash_year", selected = format(Sys.Date(), "%Y"))
-    updateSelectInput(session, "dash_month", selected = format(Sys.Date(), "%m"))
-    updateSelectInput(session, "dash_quarter", selected = paste0("Q", ceiling(as.integer(format(Sys.Date(), "%m")) / 3)))
+    updateSelectInput(session, "dash_year", selected = format(prev_mo_date, "%Y"))
+    updateSelectInput(session, "dash_month", selected = format(prev_mo_date, "%m"))
+    updateSelectInput(session, "dash_quarter", selected = paste0("Q", ceiling(as.integer(format(prev_mo_date, "%m")) / 3)))
     updateSelectizeInput(session, "dash_project", selected = character(0))
     updateSelectizeInput(session, "dash_department", selected = character(0))
     updateSelectInput(session, "breakdown_status", selected = "paid")
@@ -231,15 +309,32 @@
   }, ignoreInit = TRUE)
   
   # ---- filters: month + week work together ----
+  request_filters <- debounce(reactive({
+    list(
+      month = input$f_month %||% "",
+      week = input$f_week %||% character(),
+      project = input$f_project %||% character(),
+      budget = input$f_budget_line %||% character(),
+      person = input$f_person %||% character(),
+      submitter = input$f_submitter %||% character(),
+      query = input$f_query %||% ""
+    )
+  }), 300)
+
   base <- reactive({
     d <- data()
-      if (nzchar(v(input$f_month))) d <- filter(d, month == input$f_month)
-      if (length(input$f_week)) d <- filter(d, week %in% input$f_week)
-    if (length(input$f_project)) d <- filter(d, project_code %in% input$f_project)
-    if (length(input$f_budget_line)) d <- filter(d, budget_line_id %in% as.integer(input$f_budget_line))
-    if (length(input$f_person)) d <- filter(d, requested_by %in% input$f_person)
-    if (length(input$f_submitter)) d <- filter(d, submitted_by %in% input$f_submitter)
-    query <- trimws(v(input$f_query))
+    f <- request_filters()
+    picked <- function(x) {
+      x <- as.character(x %||% character())
+      x[!is.na(x) & nzchar(x) & x != "__none__"]
+    }
+    if (nzchar(v(f$month)) && !identical(v(f$month), "__none__")) d <- filter(d, month == f$month)
+    if (length(picked(f$week))) d <- filter(d, week %in% picked(f$week))
+    if (length(picked(f$project))) d <- filter(d, project_code %in% picked(f$project))
+    if (length(picked(f$budget))) d <- filter(d, budget_line_id %in% as.integer(picked(f$budget)))
+    if (length(picked(f$person))) d <- filter(d, requested_by %in% picked(f$person))
+    if (length(picked(f$submitter))) d <- filter(d, submitted_by %in% picked(f$submitter))
+    query <- trimws(v(f$query))
     if (nzchar(query) && nrow(d)) {
       fields <- intersect(c("description", "requested_by", "submitted_by", "project_code", "budget_line", "order_form", "po"), names(d))
       pieces <- lapply(d[fields], function(col) ifelse(is.na(col), "", as.character(col)))
@@ -255,7 +350,7 @@
   # The display window is today only (for testing; production: Friday afternoon).
   weekly_data <- reactive({
     d <- data()
-    today <- Sys.Date()
+    today <- app_today()
     # Monday of current week
     mon <- today - (as.integer(format(today, "%u")) - 1L)
     reg_dates <- suppressWarnings(as.Date(substr(as.character(d$created), 1, 10)))
@@ -263,22 +358,26 @@
   })
 
   weekly_window_active <- reactive({
-    # Show the weekly report banner today (testing mode).
-    # Production: only show on Fridays after 14:00 EAT.
-    TRUE
+    if (is_dev_mode()) return(TRUE)
+    time <- as.POSIXct(app_now(), tz = "Africa/Addis_Ababa")
+    local <- as.POSIXlt(time, tz = "Africa/Addis_Ababa")
+    weekday <- local$wday
+    minutes <- local$hour * 60L + local$min
+    (weekday == 5L && minutes >= 13L * 60L) || (weekday == 6L && minutes < 17L * 60L)
   })
   
   # Dashboard period helpers. Request values/status counts follow order_date; actual paid spend follows payment_date.
   dashboard_period_bounds <- function(offset = 0L) {
     period_type <- v(input$dash_period_type)
     if (!period_type %in% c("month", "quarter", "year")) period_type <- "month"
+    prev_mo_date <- as.Date(format(app_today(), "%Y-%m-01")) - 1L
     selected_year <- suppressWarnings(as.integer(v(input$dash_year)))
-    if (is.na(selected_year)) selected_year <- as.integer(format(Sys.Date(), "%Y"))
+    if (is.na(selected_year)) selected_year <- as.integer(format(prev_mo_date, "%Y"))
     
     if (period_type == "month") {
       month_num <- suppressWarnings(as.integer(v(input$dash_month)))
       if (is.na(month_num) || month_num < 1 || month_num > 12) {
-        month_num <- as.integer(format(Sys.Date(), "%m"))
+        month_num <- as.integer(format(prev_mo_date, "%m"))
       }
       selected_start <- as.Date(sprintf("%04d-%02d-01", selected_year, month_num))
       shift_month_start <- function(date, month_offset) {
@@ -292,7 +391,7 @@
     } else if (period_type == "quarter") {
       quarter_num <- suppressWarnings(as.integer(gsub("[^1-4]", "", v(input$dash_quarter))))
       if (is.na(quarter_num) || quarter_num < 1 || quarter_num > 4) {
-        quarter_num <- ceiling(as.integer(format(Sys.Date(), "%m")) / 3)
+        quarter_num <- ceiling(as.integer(format(app_today(), "%m")) / 3)
       }
       start_month <- (quarter_num - 1L) * 3L + 1L
       selected_start <- as.Date(sprintf("%04d-%02d-01", selected_year, start_month))
@@ -355,7 +454,7 @@
   observeEvent(input$reset, {
     # Clear means no active filters (All months), unlike the fresh-session default,
     # which intentionally starts on the current month.
-    updateSelectInput(session, "f_month", selected = "")
+    updateSelectizeInput(session, "f_month", selected = "")
     updateSelectizeInput(session, "f_week", selected = character(0))
     for (id in c("f_project", "f_budget_line", "f_person", "f_submitter"))
       updateSelectizeInput(session, id, selected = character(0))
@@ -379,7 +478,7 @@
     q <- list(
       v = "r2",
       cur = if (nzchar(active_currency())) active_currency() else NULL,
-      m = if (nzchar(v(input$f_month))) input$f_month else NULL,
+      m = if (nzchar(v(input$f_month)) && !identical(v(input$f_month), "__none__")) input$f_month else NULL,
       w = if (length(input$f_week)) enc(input$f_week) else NULL,
       p = if (length(input$f_project)) enc(input$f_project) else NULL,
       b = if (length(input$f_budget_line)) enc(as.character(input$f_budget_line)) else NULL,

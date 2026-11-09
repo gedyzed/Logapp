@@ -11,7 +11,7 @@ ui <- function(request) {
     header = tagList(tags$style(css), tags$script(HTML(js))),
     footer = tags$footer(class = "app-footer",
                          tags$img(src = "acted-logo.png", class = "footer-logo", alt = "ACTED"),
-                         span(class = "footer-copy", paste0("\u00a9 ", format(Sys.Date(), "%Y"), ". Log app. Expense tracker"))),
+                         span(class = "footer-copy", paste0("\u00a9 ", format(app_today(), "%Y"), ". Log app. Expense tracker"))),
     
     # Requests: status cards span the page. Filters sit beside the register, as in the reference.
     nav_panel(
@@ -35,41 +35,36 @@ ui <- function(request) {
                                                  downloadButton("export", "Export", class = "btn-outline-secondary")
                                              )
                              )),
-                             div(class = "card-body", DTOutput("table_requests", fill = FALSE))
+                             div(class = "card-body d-flex flex-column", DTOutput("table_requests", fill = FALSE))
                         )
               ),
-              tags$aside(class = "requests-sidebar",
-                         div(class = "requests-sidebar-head d-flex align-items-center justify-content-between",
-                             div(class = "d-flex align-items-center gap-2", icon("sliders"), span("Filters")),
-                             actionButton("reset", "Clear all", class = "btn btn-link sidebar-clear")
-                         ),
-                         div(class = "requests-sidebar-body",
-                             div(class = "filter-search",
-                                 icon("magnifying-glass"),
-                                 textInput("f_query", NULL, placeholder = "Search requests...", width = "100%")),
-                             tags$label(class = "control-label", "Status"),
-                             div(class = "status-chips", role = "group", "aria-label" = "Status",
-                                 actionButton("chip_status_all", "All", class = "status-chip is-on", `data-status` = ""),
-                                 actionButton("chip_status_waiting", "Review", class = "status-chip", `data-status` = "under_review"),
-                                 actionButton("chip_status_validation", "Pending", class = "status-chip", `data-status` = "pending"),
-                                 actionButton("chip_status_paid", "Paid", class = "status-chip", `data-status` = "paid"),
-                                 actionButton("chip_status_rejected", "Cancelled", class = "status-chip", `data-status` = "cancelled")),
-                             selectizeInput("f_project", "Project code", NULL, multiple = TRUE,
-                                            options = list(placeholder = "All projects")),
-                             selectizeInput("f_budget_line", "Budget line", NULL, multiple = TRUE,
-                                            options = list(placeholder = "All lines")),
-                             selectInput("f_month", "Request period",
-                                         choices = c("All months" = "", month_choices(format(Sys.Date(), "%Y-%m"))),
-                                         selected = format(Sys.Date(), "%Y-%m"), width = "100%"),
-                             tags$details(class = "advanced-filters",
-                                          tags$summary(tagList(icon("sliders"), " Advanced filters")),
-                                          selectizeInput("f_week", "Week", NULL, multiple = TRUE,
-                                                         options = list(placeholder = "All weeks")),
-                                          selectizeInput("f_person", "Requested by", NULL, multiple = TRUE,
-                                                         options = list(placeholder = "All requesters")),
-                                          selectizeInput("f_submitter", "Submitted by", NULL, multiple = TRUE,
-                                                         options = list(placeholder = "All focal points")))
-                         )
+              FilterPanel(
+                class = "requests-sidebar filter-panel",
+                clear_id = "reset",
+                fields = list(
+                  list(key = "f_query", type = "search", placeholder = "Search requests...", default = ""),
+                  list(key = "status", type = "chips", label = "Status", default = "",
+                       options = list(
+                         list(id = "chip_status_all", label = "All", value = "", on = TRUE),
+                         list(id = "chip_status_waiting", label = "Review", value = "under_review"),
+                         list(id = "chip_status_validation", label = "Pending", value = "pending"),
+                         list(id = "chip_status_paid", label = "Paid", value = "paid"),
+                         list(id = "chip_status_rejected", label = "Cancelled", value = "cancelled")
+                       )),
+                  list(key = "f_project", label = "Project code", type = "searchable-select", multiple = TRUE,
+                       placeholder = "All projects", default = ""),
+                  list(key = "f_budget_line", label = "Budget line", type = "searchable-select", multiple = TRUE,
+                       placeholder = "Select project code(s) first", default = "", depends = "f_project"),
+                  list(key = "f_month", label = "Request period", type = "month",
+                       choices = c("All months" = "", month_choices(c(last_month(), format(app_today(), "%Y-%m")))),
+                       selected = last_month(), default = ""),
+                  list(key = "f_week", label = "Week", type = "multi-select", advanced = TRUE,
+                       placeholder = "All weeks", default = ""),
+                  list(key = "f_person", label = "Requested by", type = "multi-select", advanced = TRUE,
+                       placeholder = "All requesters", default = ""),
+                  list(key = "f_submitter", label = "Submitted by", type = "multi-select", advanced = TRUE,
+                       placeholder = "All focal points", default = "")
+                )
               )
           )
       )
@@ -80,146 +75,110 @@ ui <- function(request) {
     # Management dashboards are separate from the request register and update workflow.
     nav_panel(
       title = "Insights", value = "dashboards",
-      div(class = "dashboard-layout",
-          div(class = "dashboard-main",
-              div(class = "page-heading dashboard-heading",
-                  div(h1("Insights"), p("A clear view of paid expenditure, request value, and procurement activity.")),
-                  div(class = "d-flex flex-column align-items-end gap-1",
-                      actionButton("toggle_dash_filter", tagList(icon("sliders"), "Filters"), class = "btn-outline-secondary btn-sm filter-toggle-btn is-active"),
-                      uiOutput("dashboard_meta")
-                  )
-              ),
-              uiOutput("totals"),
-              card(class = "dashboard-breakdown-card mt-3", fill = FALSE,
-                   card_header(div(class = "dashboard-chart-title dashboard-breakdown-title d-flex align-items-center justify-content-between flex-wrap gap-2",
-                                   div(class = "d-flex align-items-center gap-2",
-                                       span(class = "fw-semibold", "Chart view:"),
-                                       selectInput("dash_chart_select", NULL,
-                                                   choices = c(
-                                                     "Spending" = "spending",
-                                                     "Breakdown" = "breakdown",
-                                                     "Days to complete" = "days",
-                                                     "Year comparison" = "year_compare",
-                                                     "Quarter comparison" = "quarter_compare"
-                                                   ),
-                                                   selected = "spending", width = "220px")
-                                   )
-                   )),
+      div(class = "insights-page",
+          div(class = "insights-top-actions d-md-none mb-2 text-end",
+              actionButton("toggle_dash_filter",
+                           tagList(icon("sliders"), "Filters"),
+                           class = "btn-outline-secondary btn-sm")
+          ),
+          uiOutput("totals"),
+          div(class = "dashboard-layout insights-split",
+          tags$main(class = "insights-main",
+              card(class = "dashboard-breakdown-card insights-chart-card", fill = FALSE,
+                   card_header(
+                     div(class = "insights-chart-head",
+                         div(class = "insights-chart-head-left d-flex align-items-center gap-2",
+                             tags$span(class = "insights-view-label", "Chart view:"),
+                             selectInput("dash_chart_select", NULL,
+                                         choices = c(
+                                           "Spending" = "spending",
+                                           "Breakdown" = "breakdown",
+                                           "Days to complete" = "days",
+                                           "Comparison" = "comparison"
+                                         ),
+                                         selected = "comparison", width = "190px")
+                         ),
+                         div(class = "insights-chart-head-right",
+                             conditionalPanel("input.dash_chart_select === 'spending'",
+                                              div(class = "insights-seg",
+                                                  radioButtons("insights_spend_mode", NULL,
+                                                               choices = c("Daily" = "daily", "Cumulative" = "cumulative"),
+                                                               selected = "daily", inline = TRUE))
+                             ),
+                             conditionalPanel("input.dash_chart_select === 'comparison'",
+                                              div(class = "insights-seg",
+                                                  radioButtons("insights_compare_mode", NULL,
+                                                               choices = c("by quarter" = "quarter", "By month" = "month"),
+                                                               selected = "month", inline = TRUE))
+                             ),
+                             conditionalPanel("input.dash_chart_select === 'breakdown'",
+                                              div(class = "insights-breakdown-controls d-flex align-items-center gap-2",
+                                                  tags$span(class = "insights-status-label", "Status"),
+                                                  selectInput("breakdown_status", NULL,
+                                                              choices = c(
+                                                                "Paid" = "paid",
+                                                                "Pending" = "pending",
+                                                                "Under review" = "under_review",
+                                                                "Cancelled" = "cancelled"
+                                                              ),
+                                                              selected = "paid")
+                                              )
+                             )
+                         )
+                     )
+                   ),
                    div(class = "card-body",
-                       conditionalPanel("input.dash_chart_select === 'spending'",
-                                        p(class = "chart-note mb-3",
-                                          "Spending: Tracks total paid expenditure over time by payment date. Displays daily spending across a selected month, and monthly spending across a quarter or year in the chosen currency."),
-                                        plotOutput("plot_trend", height = "380px")
+                       div(class = "insights-chart-stage",
+                           conditionalPanel("input.dash_chart_select === 'spending'",
+                                            div(class = "insights-chart-panel",
+                                                uiOutput("insights_spend_title"),
+                                                conditionalPanel("input.insights_spend_mode !== 'cumulative'",
+                                                                 plotOutput("plot_trend", height = "300px")),
+                                                conditionalPanel("input.insights_spend_mode === 'cumulative'",
+                                                                 uiOutput("insights_spend_cumulative")))
+                           ),
+                           conditionalPanel("input.dash_chart_select === 'breakdown'",
+                                            div(class = "insights-chart-panel", uiOutput("insights_breakdown"))
+                           ),
+                           conditionalPanel("input.dash_chart_select === 'days'",
+                                            div(class = "insights-chart-panel", uiOutput("insights_days"))
+                           ),
+                           conditionalPanel("input.dash_chart_select === 'comparison'",
+                                            div(class = "insights-chart-panel",
+                                                div(class = "insights-plot-head",
+                                                    uiOutput("insights_compare_title"),
+                                                    uiOutput("insights_compare_delta")),
+                                                uiOutput("insights_compare_plot"))
+                           )
                        ),
-                       conditionalPanel("input.dash_chart_select === 'breakdown'",
-                                        p(class = "chart-note mb-3",
-                                          "Breakdown: Visualizes the distribution of requests across project codes, budget lines, requesters, or departments across procurement workflow stages."),
-                                        plotOutput("plot_dim", height = "auto")
-                       ),
-                       conditionalPanel("input.dash_chart_select === 'days'",
-                                        p(class = "chart-note mb-3",
-                                          "Days to complete: Compares actual processing days taken against expected lead time based on ACTED procurement scenario standards for the selected reporting period and filters."),
-                                        plotOutput("plot_days", height = "410px")
-                       ),
-                       conditionalPanel("input.dash_chart_select === 'year_compare'",
-                                        p(class = "chart-note mb-3",
-                                          "Year comparison: Compares monthly spending (Jan–Dec) year-over-year side-by-side in the chosen currency."),
-                                        plotOutput("plot_year_compare", height = "390px")
-                       ),
-                       conditionalPanel("input.dash_chart_select === 'quarter_compare'",
-                                        p(class = "chart-note mb-3",
-                                          "Quarter comparison: Compares paid spending across quarters (Q1–Q4) side-by-side across years in the chosen currency."),
-                                        plotOutput("plot_quarter_compare", height = "390px")
-                       )
+                       uiOutput("insights_footer")
                    )
               )
           ),
-          div(class = "dashboard-sidebar",
-              card(class = "dashboard-filter-card", fill = FALSE,
-                   card_header(div(class = "dashboard-filter-heading d-flex align-items-center justify-content-between w-100",
-                                   div(class = "d-flex align-items-center gap-2",
-                                       icon("sliders"), span("Reporting filters")
-                                   ),
-                                   tags$button(type = "button", id = "close_dash_filter", class = "sidebar-close-btn",
-                                               title = "Collapse filters", icon("xmark"))
-                   )),
-                   div(class = "card-body",
-                       p(class = "chart-note mb-3", "Independent from Requests filters; request value uses order date, paid spend uses payment date."),
-                       
-                       # Reporting period filters for single-period charts (Spending, Breakdown, Days)
-                       conditionalPanel("['spending', 'breakdown', 'days'].indexOf(input.dash_chart_select) !== -1",
-                                        div(class = "dashboard-filter-section mb-2",
-                                            div(class = "text-muted small fw-bold text-uppercase mb-2 tracking-wide", "Reporting Period"),
-                                            selectInput("dash_period_type", "Period", choices = c(
-                                              "Month" = "month", "Quarter" = "quarter", "Year" = "year"
-                                            ), selected = "month", width = "100%"),
-                                            selectInput("dash_year", "Year", choices = setNames(format(Sys.Date(), "%Y"), format(Sys.Date(), "%Y")),
-                                                        selected = format(Sys.Date(), "%Y"), width = "100%"),
-                                            conditionalPanel("input.dash_period_type === 'month'",
-                                                             selectInput("dash_month", "Month", choices = setNames(sprintf("%02d", 1:12), month.name),
-                                                                         selected = format(Sys.Date(), "%m"), width = "100%")
-                                            ),
-                                            conditionalPanel("input.dash_period_type === 'quarter'",
-                                                             selectInput("dash_quarter", "Quarter", choices = c(
-                                                               "Q1 · Jan–Mar" = "Q1", "Q2 · Apr–Jun" = "Q2",
-                                                               "Q3 · Jul–Sep" = "Q3", "Q4 · Oct–Dec" = "Q4"
-                                                             ), selected = paste0("Q", ceiling(as.integer(format(Sys.Date(), "%m")) / 3)), width = "100%")
-                                            )
-                                        )
-                       ),
-                       
-                       # Comparison charts notice
-                       conditionalPanel("['year_compare', 'quarter_compare'].indexOf(input.dash_chart_select) !== -1",
-                                        div(class = "alert alert-info py-2 px-3 small mb-3",
-                                            icon("circle-info"), " ",
-                                            span("Compares paid spend across all years side-by-side.")
-                                        )
-                       ),
-                       
-                       # Breakdown-specific filters: moved together to filter section
-                       conditionalPanel("input.dash_chart_select === 'breakdown'",
-                                        div(class = "dashboard-filter-section pt-2 border-top mb-2",
-                                            div(class = "text-muted small fw-bold text-uppercase mb-2 tracking-wide", "Breakdown Settings"),
-                                            selectInput("breakdown_status", "Status", choices = c(
-                                              "Paid" = "paid", "Under review" = "under_review", "Pending" = "pending", "Cancelled" = "cancelled"
-                                            ), selected = "paid", width = "100%"),
-                                            selectInput("dim", "Group by", DIMS, selected = "project_code", width = "100%"),
-                                            conditionalPanel("input.dim === 'project_code'",
-                                                             div(class = "mb-2",
-                                                                 tags$label(class = "control-label", "Project drill-down"),
-                                                                 div(class = "d-flex align-items-center gap-1",
-                                                                     div(class = "flex-grow-1",
-                                                                         selectInput("breakdown_project", NULL, choices = c("Select a project" = ""),
-                                                                                     selected = "", width = "100%")
-                                                                     ),
-                                                                     actionButton("clear_breakdown_project", "Clear", class = "btn btn-outline-secondary btn-sm mb-3", title = "Clear project drill-down")
-                                                                 ),
-                                                                 p(class = "form-hint small text-muted mt-n2 mb-2", "Select a project to inspect its budget lines.")
-                                                             )
-                                            )
-                                        )
-                       ),
-                       
-                       # Scope filters (Department & Project) apply across charts
-                       div(class = "dashboard-filter-section pt-2 border-top",
-                           div(class = "text-muted small fw-bold text-uppercase mb-2 tracking-wide", "Scope Filters"),
-                           selectizeInput("dash_department", "Department", NULL, multiple = TRUE,
-                                          options = list(placeholder = "All departments")),
-                           selectizeInput("dash_project", "Project code", NULL, multiple = TRUE,
-                                          options = list(placeholder = "All projects"))
-                       ),
-                       
-                       # Reset button for reporting filters
-                       div(class = "pt-2 mt-2 border-top",
-                           actionButton("reset_dash_filter", tagList(icon("rotate-left"), "Reset filters"),
-                                        class = "btn btn-outline-secondary btn-sm w-100")
-                       )
-                   )
-              )
+          FilterPanel(
+            class = "dashboard-sidebar insights-sidebar filter-panel",
+            clear_id = "insights_clear",
+            badge = uiOutput("insights_filter_badge", inline = TRUE),
+            close_id = "close_dash_filter",
+            fields = list(
+              list(key = "insights_month", label = "Month", type = "month",
+                   choices = c("All months" = "", month_choices()),
+                   selected = last_month(),
+                   default = ""),
+              list(key = "insights_project", label = "Project code", type = "searchable-select",
+                   choices = c("All projects" = "all"), selected = "all", default = "",
+                   placeholder = "All projects"),
+              list(key = "insights_department", label = "Department", type = "select", advanced = TRUE,
+                   choices = c("All departments" = ""), selected = "", default = "",
+                   placeholder = "All departments"),
+              list(key = "insights_scenario", label = "Scenario", type = "select", advanced = TRUE,
+                   choices = c("All scenarios" = ""), selected = "", default = "",
+                   placeholder = "All scenarios")
+            )
+          )
           )
       )
     ),
-    
     # Manage keeps the project catalogue, suppliers, email preferences, people, and defaults together.
     nav_panel(
       title = "Manage", value = "manage",
@@ -336,8 +295,11 @@ ui <- function(request) {
     nav_item(actionButton("share_nav", NULL, icon = icon("share-square"),
                           class = "nav-icon-btn", title = "Share this view", `aria-label` = "Share this view")),
     nav_item(actionButton("settings_open", NULL, icon = icon("gear"),
-                          class = "nav-icon-btn", title = "Manage", `aria-label` = "Manage"))
+                          class = "nav-icon-btn", title = "Manage", `aria-label` = "Manage")),
+    nav_item(actionButton("logout_btn", NULL, icon = icon("arrow-right-from-bracket"),
+                          class = "nav-icon-btn", title = "Logout", `aria-label` = "Logout"))
   )
 }
 # =============================================================================
 # SERVER
+

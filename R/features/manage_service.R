@@ -62,7 +62,7 @@
     catalog <- project_catalog_view()
     catalog$last_deducted_at <- NULL
     datatable(catalog, rownames = FALSE, selection = "single", filter = "none",
-              options = list(pageLength = 8, lengthChange = FALSE, searching = TRUE,
+              options = list(pageLength = 10, lengthChange = FALSE, searching = TRUE,
                              scrollX = TRUE, dom = "ftip", columnDefs = list(
                                list(targets = 0, visible = FALSE, searchable = FALSE, orderable = FALSE)),
                              language = dt_language),
@@ -74,7 +74,7 @@
       mutate(status = ifelse(active == 1, "Active", "Inactive")) |>
       select(id, supplier_name, status)
     datatable(sup, rownames = FALSE, selection = "single", filter = "none",
-              options = list(pageLength = 8, searching = TRUE, scrollX = TRUE, dom = "ftip",
+              options = list(pageLength = 10, searching = TRUE, scrollX = TRUE, dom = "ftip",
                              columnDefs = list(list(targets = 0, visible = FALSE, searchable = FALSE, orderable = FALSE)),
                              language = dt_language),
               colnames = c("ID", "Supplier", "Status"))
@@ -124,9 +124,9 @@
   
   observeEvent(input$save_project_edit, {
     id <- project_edit_id(); code <- trimws(v(input$edit_project_code))
-    if (is.null(id) || !nzchar(code)) { showNotification("Project code is required.", type = "warning"); return() }
+    if (is.null(id) || !nzchar(code)) { showNotification("Project code is required.", type = "error"); return() }
     if (nrow(db_get("SELECT id FROM projects WHERE project_code = ? COLLATE NOCASE AND id <> ?", code, as.integer(id))) > 0) {
-      showNotification("That project code is already in use.", type = "warning"); return()
+      showNotification("That project code is already in use.", type = "error"); return()
     }
     cn <- con(); on.exit(dbDisconnect(cn))
     dbExecute(cn, "UPDATE projects SET project_code=?, department=?, location=?, updated=? WHERE id=?",
@@ -149,8 +149,8 @@
   
   observeEvent(input$save_supplier_edit, {
     id <- supplier_edit_id(); name <- trimws(v(input$edit_supplier_name))
-    if (is.null(id) || !nzchar(name)) { showNotification("Supplier name is required.", type = "warning"); return() }
-    if (nrow(db_get("SELECT id FROM suppliers WHERE supplier_name = ? COLLATE NOCASE AND id <> ?", name, as.integer(id))) > 0) { showNotification("That supplier name already exists.", type = "warning"); return() }
+    if (is.null(id) || !nzchar(name)) { showNotification("Supplier name is required.", type = "error"); return() }
+    if (nrow(db_get("SELECT id FROM suppliers WHERE supplier_name = ? COLLATE NOCASE AND id <> ?", name, as.integer(id))) > 0) { showNotification("That supplier name already exists.", type = "error"); return() }
     cn <- con(); on.exit(dbDisconnect(cn))
     dbExecute(cn, "UPDATE suppliers SET supplier_name=?,active=?,updated=? WHERE id=?",
               params = list(name, as.integer(isTRUE(input$edit_supplier_active)), now(), as.integer(id)))
@@ -209,12 +209,12 @@
   observeEvent(input$cfg_add_project, {
     code <- trimws(v(input$cfg_project_code))
     if (!nzchar(code)) {
-      showNotification("Enter a project code first.", type = "warning")
+      showNotification("Enter a project code first.", type = "error")
       return()
     }
     exists <- nrow(db_get("SELECT id FROM projects WHERE project_code = ? COLLATE NOCASE", code)) > 0
     if (exists) {
-      showNotification("That project code already exists. Choose it in the budget-line section instead.", type = "warning")
+      showNotification("That project code already exists. Choose it in the budget-line section instead.", type = "error")
       return()
     }
     cn <- con(); on.exit(dbDisconnect(cn))
@@ -242,7 +242,7 @@
     code <- trimws(v(input$cfg_budget_project))
     line <- trimws(v(input$cfg_budget_line))
     if (!nzchar(code) || !nzchar(line)) {
-      showNotification("Choose a project and enter a budget line.", type = "warning")
+      showNotification("Choose a project and enter a budget line.", type = "error")
       return()
     }
     p_row <- db_get("SELECT id FROM projects WHERE project_code = ? COLLATE NOCASE", code)
@@ -253,7 +253,7 @@
     exists <- nrow(db_get("SELECT id FROM budget_lines WHERE project_id = ? AND budget_line_code = ? COLLATE NOCASE",
                           as.integer(p_row$id[[1]]), line)) > 0
     if (exists) {
-      showNotification("That budget line is already configured for this project.", type = "warning")
+      showNotification("That budget line is already configured for this project.", type = "error")
       return()
     }
     cn <- con(); on.exit(dbDisconnect(cn))
@@ -278,13 +278,13 @@
   observeEvent(input$cfg_add_supplier, {
     supplier_name <- trimws(v(input$cfg_supplier_name))
     if (!nzchar(supplier_name)) {
-      showNotification("Enter a supplier name first.", type = "warning")
+      showNotification("Enter a supplier name first.", type = "error")
       return()
     }
     cn <- con(); on.exit(dbDisconnect(cn))
     exists <- nrow(dbGetQuery(cn, "SELECT id FROM suppliers WHERE supplier_name = ? COLLATE NOCASE", params = list(supplier_name))) > 0
     if (exists) {
-      showNotification("That supplier already exists.", type = "warning")
+      showNotification("That supplier already exists.", type = "error")
       return()
     }
     dbExecute(cn, "INSERT INTO suppliers(supplier_name,email,phone,active,created,updated) VALUES(?,?,?,?,?,?)",
