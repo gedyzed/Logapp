@@ -95,14 +95,14 @@ login_style <- "
   .panel-auth > .row {
     margin: 0 !important;
     width: 100% !important;
-    max-width: 440px !important;
+    max-width: 400px !important;
     display: flex !important;
     justify-content: center !important;
   }
   
   .panel-auth > .row > div {
     width: 100% !important;
-    max-width: 440px !important;
+    max-width: 400px !important;
     margin: 0 !important;
     padding: 0 !important;
     float: none !important;
@@ -113,10 +113,12 @@ login_style <- "
   .panel-auth .panel-primary {
     background: #ffffff !important;
     border: 1px solid #e4e4e7 !important;
-    border-radius: 16px !important;
+    border-radius: 20px !important;
     box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05), 0 2px 6px -1px rgba(0, 0, 0, 0.02) !important;
     overflow: hidden !important;
     margin: 0 !important;
+    width: 100% !important;
+    max-width: 400px !important;
   }
   
   .panel-auth .panel-heading {
@@ -125,7 +127,7 @@ login_style <- "
   
   .panel-auth .panel-body {
     background: #ffffff !important;
-    padding: 2.25rem 2.25rem 2.5rem 2.25rem !important;
+    padding: 2.6rem 2.2rem 2.8rem 2.2rem !important;
   }
   
   .panel-auth .panel-body > br {
@@ -134,11 +136,11 @@ login_style <- "
   
   /* Auth heading */
   #auth-shinymanager-auth-head {
-    color: #09090b !important;
-    font-size: 1.45rem !important;
-    font-weight: 700 !important;
+    color: #0f172a !important;
+    font-size: 1.7rem !important;
+    font-weight: 600 !important;
     letter-spacing: -0.02em !important;
-    margin: 0 0 1.5rem 0 !important;
+    margin: 1.25rem 0 1.6rem 0 !important;
     text-align: center !important;
     font-family: inherit !important;
   }
@@ -147,7 +149,7 @@ login_style <- "
   #auth-user_input {
     display: flex;
     flex-direction: column;
-    gap: 1.1rem;
+    gap: 1.25rem;
     margin-bottom: 0.25rem;
   }
   
@@ -155,10 +157,10 @@ login_style <- "
     margin-bottom: 0 !important;
   }
   
-  /* Labels */
+  /* Labels: Deep navy blue matching reference */
   .panel-auth .control-label {
-    font-weight: 600 !important;
-    color: #09090b !important;
+    font-weight: 650 !important;
+    color: #1e3a8a !important;
     font-size: 0.875rem !important;
     margin-bottom: 0.45rem !important;
     display: block !important;
@@ -168,12 +170,12 @@ login_style <- "
   /* Clean inputs with soft blue background */
   .panel-auth .form-control {
     background-color: #eff6ff !important;
-    border: 1px solid #c7d7f8 !important;
-    border-radius: 8px !important;
-    padding: 0.65rem 0.95rem !important;
+    border: 1px solid #bfdbfe !important;
+    border-radius: 10px !important;
+    padding: 0.75rem 1rem !important;
     font-size: 0.95rem !important;
-    height: 2.85rem !important;
-    color: #09090b !important;
+    height: 3rem !important;
+    color: #1e293b !important;
     background-image: none !important;
     box-shadow: none !important;
     transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease !important;
@@ -188,7 +190,7 @@ login_style <- "
   
   /* Login button */
   #auth-container-btn-ok {
-    margin-top: 1.25rem !important;
+    margin-top: 1.5rem !important;
   }
   
   #auth-container-btn-ok > br {
@@ -200,11 +202,11 @@ login_style <- "
     border: none !important;
     color: #ffffff !important;
     font-weight: 600 !important;
-    border-radius: 8px !important;
+    border-radius: 10px !important;
     padding: 0.75rem 1.5rem !important;
     width: 100% !important;
-    min-height: 2.85rem !important;
-    font-size: 0.95rem !important;
+    height: 3rem !important;
+    font-size: 1rem !important;
     transition: background-color 0.15s ease, transform 0.1s ease !important;
     box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
   }
@@ -261,25 +263,25 @@ secured_ui <- shinymanager::secure_app(
     # Top-left Welcome Back
     tags$div(
       class = "login-welcome-box",
-      style = "text-align: left; margin-bottom: 1.5rem;",
+      style = "text-align: left; margin-bottom: 1.85rem;",
       tags$div(
-        style = "color: #2563eb; font-weight: 700; font-size: 1.35rem; line-height: 1.25; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;",
+        style = "color: #2563eb; font-weight: 700; font-size: 1.4rem; line-height: 1.25; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;",
         "Welcome Back"
       ),
       tags$div(
-        style = "color: #71717a; font-size: 0.85rem; margin-top: 0.25rem; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;",
+        style = "color: #6b7280; font-size: 0.875rem; margin-top: 0.35rem; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;",
         "Please enter your details to continue."
       )
     ),
     # Centered Logo and Brand Lockup
     tags$div(
       class = "login-brand-lockup",
-      style = "display: flex; align-items: center; justify-content: center; gap: 0.65rem; margin-bottom: 1.25rem;",
+      style = "display: flex; align-items: center; justify-content: center; gap: 0.75rem; margin-bottom: 1.5rem;",
       # Blue rounded square with white L
       tags$div(
-        style = "width: 2.25rem; height: 2.25rem; border-radius: 8px; background: #2563eb; display: flex; align-items: center; justify-content: center; flex-shrink: 0;",
+        style = "width: 2.6rem; height: 2.6rem; border-radius: 10px; background: #2563eb; display: flex; align-items: center; justify-content: center; flex-shrink: 0;",
         tags$span(
-          style = "color: #ffffff; font-weight: 700; font-size: 1.25rem; line-height: 1; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;",
+          style = "color: #ffffff; font-weight: 700; font-size: 1.4rem; line-height: 1; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;",
           "L"
         )
       ),
@@ -287,11 +289,11 @@ secured_ui <- shinymanager::secure_app(
       tags$div(
         style = "text-align: left;",
         tags$div(
-          style = "color: #09090b; font-weight: 700; font-size: 1.05rem; line-height: 1.15; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;",
+          style = "color: #2563eb; font-weight: 700; font-size: 1.25rem; line-height: 1.15; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;",
           "Logapp"
         ),
         tags$div(
-          style = "color: #71717a; font-size: 0.75rem; font-weight: 500; line-height: 1.15; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;",
+          style = "color: #6b7280; font-size: 0.85rem; font-weight: 500; line-height: 1.15; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;",
           "Expense Tracker"
         )
       )
