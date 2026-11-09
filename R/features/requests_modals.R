@@ -61,7 +61,7 @@
                                     choices = c("", uniq(c(isolate(data())$country, DEFAULTS$country))),
                                     selected = DEFAULTS$country %||% "", width = "100%",
                                     options = list(create = TRUE, placeholder = "e.g. ETH"))),
-              col(6, date_in("of_date", "Order date", Sys.Date(), width = "100%")),
+              col(6, date_in("of_date", "Order date", app_today(), width = "100%")),
               col(12, textAreaInput("remarks", "Remarks", rows = 2, width = "100%"))
           )
       ),
@@ -118,7 +118,7 @@
   })
 
   waiver_val <- reactive(if (isTRUE(input$framework)) "Framework agreement" else "No")
-  odate      <- reactive(if (has_date(input$of_date)) input$of_date else Sys.Date())
+  odate      <- reactive(if (has_date(input$of_date)) input$of_date else app_today())
 
   form_rec <- reactive(list(
     project_code = v(input$project_code), budget_line = v(input$budget_line),
@@ -193,7 +193,7 @@
       updateSelectInput(session, id, selected = "")
     updateCheckboxInput(session, "framework", value = FALSE)
     for (id in c("amount", "quantity")) updateNumericInput(session, id, value = NA)
-    suppressWarnings(updateDateInput(session, "of_date", value = Sys.Date()))
+    suppressWarnings(updateDateInput(session, "of_date", value = app_today()))
     updateTextAreaInput(session, "remarks", value = "")
     touched(character()); show_all(FALSE)
   }
@@ -267,10 +267,13 @@
       projects <- if (!is.null(q[["p"]])) vals("p") else NULL
       dept <- if (!is.null(q[["d"]]) && !grepl("|", q[["d"]], fixed = TRUE)) q[["d"]] else NULL
       scen <- if (!is.null(q[["sc"]])) q[["sc"]] else NULL
-      if (!is.null(month)) updateSelectInput(session, "insights_month", selected = month)
-      if (!is.null(projects)) updateSelectizeInput(session, "insights_project", selected = projects)
-      if (!is.null(dept)) updateSelectInput(session, "insights_department", selected = dept)
-      if (!is.null(scen)) updateSelectInput(session, "insights_scenario", selected = scen)
+      if (!is.null(month)) updateSelectizeInput(session, "insights_month", selected = month)
+      if (!is.null(projects)) {
+        one <- if (exists("insights_project_codes", mode = "function")) insights_project_codes(projects) else projects
+        updateSelectizeInput(session, "insights_project", selected = if (length(one)) one[[1]] else "all")
+      }
+      if (!is.null(dept)) updateSelectizeInput(session, "insights_department", selected = dept)
+      if (!is.null(scen)) updateSelectizeInput(session, "insights_scenario", selected = scen)
       if (!is.null(month) && exists("insights_commit", mode = "function")) {
         insights_commit(month, if (is.null(projects)) character() else projects,
                         if (is.null(dept)) "" else dept,
@@ -283,8 +286,8 @@
     if (!is.null(q[["find"]])) updateTextInput(session, "f_query", value = q[["find"]])
     if (!is.null(q[["st"]])) set_request_status(q[["st"]])
     d <- isolate(data())
-    if (!is.null(q[["m"]]) && !is.na(q[["m"]])) updateSelectInput(session, "f_month", selected = q[["m"]])
-    else updateSelectInput(session, "f_month", selected = "")
+    if (!is.null(q[["m"]]) && !is.na(q[["m"]])) updateSelectizeInput(session, "f_month", selected = q[["m"]])
+    else updateSelectizeInput(session, "f_month", selected = "")
     set <- function(id, key, choices) {
       sel <- vals(key)
       if (length(sel)) updateSelectizeInput(session, id, choices = with_sel(choices, sel), selected = sel)
@@ -411,7 +414,7 @@
                 col(4, textInput("m_unit", "Unit", v(r$unit), width = "100%")),
                 col(4, div(style = "padding-top:1.9rem", checkboxInput("m_framework", "Framework agreement", value = identical(v(r$waiver), "Framework agreement")))),
                 col(8, textAreaInput("m_remarks", "Remarks", v(r$remarks), rows = 2, width = "100%")),
-                col(6, date_in("m_order_date", "Order date", if (is.na(r$order_date)) Sys.Date() else as.Date(r$order_date), width = "100%"))),
+                col(6, date_in("m_order_date", "Order date", if (is.na(r$order_date)) app_today() else as.Date(r$order_date), width = "100%"))),
             div(class = "reference-panel",
                 div(class = "form-section-title", "Generated references"),
                 div(class = "reference-grid",
@@ -429,8 +432,23 @@
 
   observeEvent(input$open_request_row, {
     id <- suppressWarnings(as.integer(input$open_request_row$id))
+    # #region agent log
+    try(cat(sprintf("{\"sessionId\":\"3d2873\",\"hypothesisId\":\"H1\",\"location\":\"requests_modals.R:open_request_row\",\"message\":\"row click\",\"data\":{\"detail\":\"id=%s status_label=%s\"},\"timestamp\":%s,\"runId\":\"pre\"}\n",
+                    paste(id, collapse = ","), exists("status_label", mode = "function"),
+                    format(as.numeric(Sys.time()) * 1000, scientific = FALSE, digits = 15)),
+             file = "c:/Users/Staff/OneDrive - ACTED/Documents/Projects/expense-tracker-acted/.cursor/debug-3d2873.log", append = TRUE), silent = TRUE)
+    # #endregion
     if (length(id) != 1L || is.na(id)) { showNotification("Could not identify that request.", type = "warning"); return() }
-    edit_id(id); render_request_modal(id, edit_mode = FALSE)
+    edit_id(id)
+    tryCatch(render_request_modal(id, edit_mode = FALSE), error = function(e) {
+      # #region agent log
+      try(cat(sprintf("{\"sessionId\":\"3d2873\",\"hypothesisId\":\"H1\",\"location\":\"requests_modals.R:render_request_modal\",\"message\":\"modal failed\",\"data\":{\"detail\":\"%s\"},\"timestamp\":%s,\"runId\":\"pre\"}\n",
+                      gsub("\"", "'", conditionMessage(e)),
+                      format(as.numeric(Sys.time()) * 1000, scientific = FALSE, digits = 15)),
+               file = "c:/Users/Staff/OneDrive - ACTED/Documents/Projects/expense-tracker-acted/.cursor/debug-3d2873.log", append = TRUE), silent = TRUE)
+      # #endregion
+      stop(e)
+    })
   })
   observeEvent(input$start_edit_modal, {
     id <- edit_id()
@@ -514,7 +532,7 @@
                          selected = "", width = "100%",
                          options = list(create = TRUE, placeholder = "Type or choose a supplier")),
           textInput("proc_reason", "PO reason *", width = "100%", placeholder = "e.g. Vehicle Rent"),
-          date_in("proc_po_date", "PO date *", Sys.Date(), width = "100%")),
+          date_in("proc_po_date", "PO date *", app_today(), width = "100%")),
       footer = div(
         class = "d-flex justify-content-between align-items-center w-100",
         modalButton(tagList(icon("arrow-left"), "Back")),
@@ -569,7 +587,7 @@
       size = "m", easyClose = TRUE,
       div(class = "nr",
           p(class = "form-hint", "This records a payment assertion inside the tracker. No external payment is executed."),
-          date_in("pay_date", "Payment date *", Sys.Date(), width = "100%"),
+          date_in("pay_date", "Payment date *", app_today(), width = "100%"),
           checkboxInput("pay_confirm", "I confirm this request has been paid.", value = FALSE)),
       footer = div(
         class = "d-flex justify-content-between align-items-center w-100",
@@ -668,7 +686,7 @@
   output$weekly_report_banner <- renderUI({
     if (!weekly_window_active()) return(NULL)
     wd     <- weekly_data()
-    today  <- Sys.Date()
+    today  <- app_today()
     mon    <- today - (as.integer(format(today, "%u")) - 1L)
     period <- paste0(format(mon, "%d %b"), " \u2013 ", format(today, "%d %b %Y"))
     n_req  <- nrow(wd)

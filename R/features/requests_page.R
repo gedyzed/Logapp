@@ -11,7 +11,7 @@ ui <- function(request) {
     header = tagList(tags$style(css), tags$script(HTML(js))),
     footer = tags$footer(class = "app-footer",
                          tags$img(src = "acted-logo.png", class = "footer-logo", alt = "ACTED"),
-                         span(class = "footer-copy", paste0("\u00a9 ", format(Sys.Date(), "%Y"), ". Log app. Expense tracker"))),
+                         span(class = "footer-copy", paste0("\u00a9 ", format(app_today(), "%Y"), ". Log app. Expense tracker"))),
     
     # Requests: status cards span the page. Filters sit beside the register, as in the reference.
     nav_panel(
@@ -35,41 +35,36 @@ ui <- function(request) {
                                                  downloadButton("export", "Export", class = "btn-outline-secondary")
                                              )
                              )),
-                             div(class = "card-body", DTOutput("table_requests", fill = FALSE))
+                             div(class = "card-body d-flex flex-column", DTOutput("table_requests", fill = FALSE))
                         )
               ),
-              tags$aside(class = "requests-sidebar",
-                         div(class = "requests-sidebar-head d-flex align-items-center justify-content-between",
-                             div(class = "d-flex align-items-center gap-2", icon("sliders"), span("Filters")),
-                             actionButton("reset", "Clear all", class = "btn btn-link sidebar-clear")
-                         ),
-                         div(class = "requests-sidebar-body",
-                             div(class = "filter-search",
-                                 icon("magnifying-glass"),
-                                 textInput("f_query", NULL, placeholder = "Search requests...", width = "100%")),
-                             tags$label(class = "control-label", "Status"),
-                             div(class = "status-chips", role = "group", "aria-label" = "Status",
-                                 actionButton("chip_status_all", "All", class = "status-chip is-on", `data-status` = ""),
-                                 actionButton("chip_status_waiting", "Review", class = "status-chip", `data-status` = "under_review"),
-                                 actionButton("chip_status_validation", "Pending", class = "status-chip", `data-status` = "pending"),
-                                 actionButton("chip_status_paid", "Paid", class = "status-chip", `data-status` = "paid"),
-                                 actionButton("chip_status_rejected", "Cancelled", class = "status-chip", `data-status` = "cancelled")),
-                             selectizeInput("f_project", "Project code", NULL, multiple = TRUE,
-                                            options = list(placeholder = "All projects")),
-                             selectizeInput("f_budget_line", "Budget line", NULL, multiple = TRUE,
-                                            options = list(placeholder = "All lines")),
-                             selectInput("f_month", "Request period",
-                                         choices = c("All months" = "", month_choices(format(Sys.Date(), "%Y-%m"))),
-                                         selected = format(Sys.Date(), "%Y-%m"), width = "100%"),
-                             tags$details(class = "advanced-filters",
-                                          tags$summary(tagList(icon("sliders"), " Advanced filters")),
-                                          selectizeInput("f_week", "Week", NULL, multiple = TRUE,
-                                                         options = list(placeholder = "All weeks")),
-                                          selectizeInput("f_person", "Requested by", NULL, multiple = TRUE,
-                                                         options = list(placeholder = "All requesters")),
-                                          selectizeInput("f_submitter", "Submitted by", NULL, multiple = TRUE,
-                                                         options = list(placeholder = "All focal points")))
-                         )
+              FilterPanel(
+                class = "requests-sidebar filter-panel",
+                clear_id = "reset",
+                fields = list(
+                  list(key = "f_query", type = "search", placeholder = "Search requests...", default = ""),
+                  list(key = "status", type = "chips", label = "Status", default = "",
+                       options = list(
+                         list(id = "chip_status_all", label = "All", value = "", on = TRUE),
+                         list(id = "chip_status_waiting", label = "Review", value = "under_review"),
+                         list(id = "chip_status_validation", label = "Pending", value = "pending"),
+                         list(id = "chip_status_paid", label = "Paid", value = "paid"),
+                         list(id = "chip_status_rejected", label = "Cancelled", value = "cancelled")
+                       )),
+                  list(key = "f_project", label = "Project code", type = "searchable-select", multiple = TRUE,
+                       placeholder = "All projects", default = ""),
+                  list(key = "f_budget_line", label = "Budget line", type = "searchable-select", multiple = TRUE,
+                       placeholder = "Select project code(s) first", default = "", depends = "f_project"),
+                  list(key = "f_month", label = "Request period", type = "month",
+                       choices = c("All months" = "", month_choices(format(app_today(), "%Y-%m"))),
+                       selected = format(app_today(), "%Y-%m"), default = ""),
+                  list(key = "f_week", label = "Week", type = "multi-select", advanced = TRUE,
+                       placeholder = "All weeks", default = ""),
+                  list(key = "f_person", label = "Requested by", type = "multi-select", advanced = TRUE,
+                       placeholder = "All requesters", default = ""),
+                  list(key = "f_submitter", label = "Submitted by", type = "multi-select", advanced = TRUE,
+                       placeholder = "All focal points", default = "")
+                )
               )
           )
       )
@@ -126,65 +121,60 @@ ui <- function(request) {
                                                                 "Under review" = "under_review",
                                                                 "Cancelled" = "cancelled"
                                                               ),
-                                                              selected = "paid", width = "125px"),
-                                                  tags$button(type = "button", class = "btn btn-outline-secondary btn-sm insights-chart-btn",
-                                                              icon("chart-simple"))
+                                                              selected = "paid")
                                               )
                              )
                          )
                      )
                    ),
                    div(class = "card-body",
-                       conditionalPanel("input.dash_chart_select === 'spending'",
-                                        uiOutput("insights_spend_title"),
-                                        plotOutput("plot_trend", height = "300px")
-                       ),
-                       conditionalPanel("input.dash_chart_select === 'breakdown'",
-                                        uiOutput("insights_breakdown")
-                       ),
-                       conditionalPanel("input.dash_chart_select === 'days'",
-                                        uiOutput("insights_days")
-                       ),
-                       conditionalPanel("input.dash_chart_select === 'comparison'",
-                                        div(class = "insights-plot-head",
-                                            uiOutput("insights_compare_title"),
-                                            uiOutput("insights_compare_delta")),
-                                        plotOutput("plot_comparison", height = "300px")
+                       div(class = "insights-chart-stage",
+                           conditionalPanel("input.dash_chart_select === 'spending'",
+                                            div(class = "insights-chart-panel",
+                                                uiOutput("insights_spend_title"),
+                                                conditionalPanel("input.insights_spend_mode !== 'cumulative'",
+                                                                 plotOutput("plot_trend", height = "300px")),
+                                                conditionalPanel("input.insights_spend_mode === 'cumulative'",
+                                                                 uiOutput("insights_spend_cumulative")))
+                           ),
+                           conditionalPanel("input.dash_chart_select === 'breakdown'",
+                                            div(class = "insights-chart-panel", uiOutput("insights_breakdown"))
+                           ),
+                           conditionalPanel("input.dash_chart_select === 'days'",
+                                            div(class = "insights-chart-panel", uiOutput("insights_days"))
+                           ),
+                           conditionalPanel("input.dash_chart_select === 'comparison'",
+                                            div(class = "insights-chart-panel",
+                                                div(class = "insights-plot-head",
+                                                    uiOutput("insights_compare_title"),
+                                                    uiOutput("insights_compare_delta")),
+                                                uiOutput("insights_compare_plot"))
+                           )
                        ),
                        uiOutput("insights_footer")
                    )
               )
           ),
-          tags$aside(class = "dashboard-sidebar insights-sidebar",
-                     div(class = "insights-sidebar-head d-flex align-items-center justify-content-between",
-                         div(class = "d-flex align-items-center gap-2",
-                             icon("sliders"), span("Filters"),
-                             uiOutput("insights_filter_badge", inline = TRUE)
-                         ),
-                         tags$button(type = "button", id = "close_dash_filter", class = "sidebar-close-btn",
-                                     title = "Close filters", icon("xmark"))
-                     ),
-                     div(class = "requests-sidebar-body",
-                         tags$label(class = "control-label", "Month"),
-                         selectInput("insights_month", NULL,
-                                     choices = month_choices(),
-                                     selected = format(Sys.Date(), "%Y-%m"),
-                                     width = "100%"),
-                          tags$label(class = "control-label", "PROJECT CODE"),
-                          selectizeInput("insights_project", NULL, choices = NULL, multiple = TRUE,
-                                         width = "100%",
-                                         options = list(placeholder = "All projects", plugins = list("remove_button"))),
-                          tags$details(class = "advanced-filters mt-3",
-                                       tags$summary(tagList(icon("sliders"), " Advanced filters")),
-                                       tags$label(class = "control-label mt-2", "Department"),
-                                       selectInput("insights_department", NULL,
-                                                   choices = c("All departments" = "", setNames(DEPTS, DEPTS)),
-                                                   selected = "", width = "100%"),
-                                       tags$label(class = "control-label", "Scenario"),
-                                       selectInput("insights_scenario", NULL,
-                                                   choices = c("All scenarios" = "", SCEN_NAME),
-                                                   selected = "", width = "100%"))
-                     )
+          FilterPanel(
+            class = "dashboard-sidebar insights-sidebar filter-panel",
+            clear_id = "insights_clear",
+            badge = uiOutput("insights_filter_badge", inline = TRUE),
+            close_id = "close_dash_filter",
+            fields = list(
+              list(key = "insights_month", label = "Month", type = "month",
+                   choices = c("All months" = "", month_choices()),
+                   selected = format(app_today(), "%Y-%m"),
+                   default = ""),
+              list(key = "insights_project", label = "Project code", type = "searchable-select",
+                   choices = c("All projects" = "all"), selected = "all", default = "",
+                   placeholder = "All projects"),
+              list(key = "insights_department", label = "Department", type = "select", advanced = TRUE,
+                   choices = c("All departments" = ""), selected = "", default = "",
+                   placeholder = "All departments"),
+              list(key = "insights_scenario", label = "Scenario", type = "select", advanced = TRUE,
+                   choices = c("All scenarios" = ""), selected = "", default = "",
+                   placeholder = "All scenarios")
+            )
           )
           )
       )

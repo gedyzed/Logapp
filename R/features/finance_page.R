@@ -546,7 +546,7 @@ if (exists("input", inherits = FALSE) && exists("output", inherits = FALSE)) {
     safe <- gsub("_+", "_", safe)
     safe <- gsub("^_|_$", "", safe)
     if (!nzchar(safe)) safe <- "batch"
-    paste0(safe, "_", format(Sys.Date(), "%Y%m%d"), ".xlsx")
+    paste0(safe, "_", format(app_today(), "%Y%m%d"), ".xlsx")
   }
 
   fin_batch_label <- function(batch) {

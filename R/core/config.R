@@ -84,6 +84,17 @@ DB <- normalizePath(db_target, winslash = "/", mustWork = FALSE)
 message("Expense Tracker SQLite database: ", DB)
 CUR    <- c("ETB", "USD", "EUR", "GBP")
 STATUS <- c("under_review", "pending", "paid", "cancelled")
+status_label <- function(status) {
+  switch(as.character(status %||% ""),
+         under_review = "Under review",
+         pending = "Pending",
+         paid = "Paid",
+         cancelled = "Cancelled",
+         waiting = "Under review",
+         "under validation" = "Pending",
+         rejected = "Cancelled",
+         as.character(status %||% ""))
+}
 DEPTS  <- c("REACH", "PANDA", "ACTED")
 
 
@@ -118,15 +129,45 @@ DIMS <- c(Project = "project_code", Requester = "requested_by",
 
 `%||%` <- function(a, b) if (is.null(a)) b else a
 
+# Tests set TRACKER_NOW to an Africa/Addis_Ababa time. Unset, this is the real clock.
+# Insert stamps keep using Sys.time() through now() and db_stamp().
+app_now <- function() {
+  raw <- trimws(Sys.getenv("TRACKER_NOW", unset = ""))
+  if (!nzchar(raw)) return(Sys.time())
+  parsed <- suppressWarnings(as.POSIXct(raw, tz = "Africa/Addis_Ababa"))
+  if (length(parsed) != 1L || is.na(parsed)) {
+    stop("TRACKER_NOW must be a time in Africa/Addis_Ababa, such as 2026-11-06 12:59:00. Got: ", raw, call. = FALSE)
+  }
+  parsed
+}
+
+app_today <- function() {
+  raw <- trimws(Sys.getenv("TRACKER_NOW", unset = ""))
+  if (!nzchar(raw)) return(Sys.Date())
+  as.Date(app_now(), tz = "Africa/Addis_Ababa")
+}
+
+safe_date <- function(x) {
+  if (is.null(x) || length(x) == 0) return(as.Date(NA))
+  x <- as.character(x)
+  bad <- is.na(x) | !nzchar(x) | x %in% c("All", "All months")
+  out <- as.Date(rep(NA_character_, length(x)))
+  if (any(!bad)) out[!bad] <- as.Date(x[!bad], optional = TRUE)
+  out
+}
+
 month_choices <- function(month_values = NULL) {
   if (is.null(month_values)) {
-    yr <- format(Sys.Date(), "%Y")
+    yr <- format(app_today(), "%Y")
     month_values <- sprintf("%s-%02d", yr, 1:12)
   }
   month_values <- sort(unique(as.character(month_values[!is.na(month_values) & nzchar(month_values)])),
                        decreasing = FALSE)
   if (!length(month_values)) return(character())
-  setNames(month_values, format(as.Date(paste0(month_values, "-01")), "%B %Y"))
+  parsed <- safe_date(paste0(month_values, "-01"))
+  bad <- is.na(parsed)
+  if (!any(!bad)) return(character())
+  setNames(month_values[!bad], format(parsed[!bad], "%B %Y"))
 }
 
 # A <500 | B 500-<5k | C 5k-<30k | D 30k-<150k | E >=150k | G if framework

@@ -1,7 +1,7 @@
 # Read this month's EuroInfo rates from the database. No rate service is called.
 # A missing table or a missing month returns NULL. Finance then counts those amounts as zero.
 
-euroinfo_month_rates <- function(month = format(Sys.Date(), "%Y-%m")) {
+euroinfo_month_rates <- function(month = format(app_today(), "%Y-%m")) {
   if (!exists("con", mode = "function")) return(NULL)
   cn <- tryCatch(con(), error = function(e) NULL)
   if (is.null(cn)) return(NULL)
@@ -37,7 +37,7 @@ euroinfo_month_rates <- function(month = format(Sys.Date(), "%Y-%m")) {
 # Return EuroInfo rates if available in the database; otherwise fall back to default
 # conversion rates (from RATES in config.R) so finance calculations and exports work
 # smoothly until EuroInfo tables are loaded.
-fin_effective_rates <- function(month = format(Sys.Date(), "%Y-%m")) {
+fin_effective_rates <- function(month = format(app_today(), "%Y-%m")) {
   rates <- euroinfo_month_rates(month)
   default_rates <- c(
     USD = unname(RATES[["ETB"]] / RATES[["USD"]]),
