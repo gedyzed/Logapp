@@ -44,3 +44,4 @@ Browser-dependent requirements (`[2]`, `[3b]`, `[5]`, `[6]`) are verified at the
 - **Integration Suite Duration**: ~76.1s (130 passed assertions across 7 test files, each file completing in `< 20s`)
 - **Total Assertions**: 191 passed assertions, 0 unexpected failures, 0 regressions.
 - **Runner**: `Rscript run_tests.R` (or `Rscript scripts/test.R`)
+

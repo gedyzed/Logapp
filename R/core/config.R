@@ -129,6 +129,11 @@ DIMS <- c(Project = "project_code", Requester = "requested_by",
 
 `%||%` <- function(a, b) if (is.null(a)) b else a
 
+is_dev_mode <- function() {
+  val <- tolower(trimws(Sys.getenv("DEV", unset = Sys.getenv("dev", unset = "FALSE"))))
+  val %in% c("true", "1", "t", "yes")
+}
+
 # Tests set TRACKER_NOW to an Africa/Addis_Ababa time. Unset, this is the real clock.
 # Insert stamps keep using Sys.time() through now() and db_stamp().
 app_now <- function() {

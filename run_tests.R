@@ -49,3 +49,4 @@ if (total_failed > 0) {
   cat("[SUCCESS] All unit and integration tests passed cleanly!\n")
   quit(status = 0)
 }
+

@@ -347,9 +347,12 @@
   })
 
   weekly_window_active <- reactive({
-    # Show the weekly report banner today (testing mode).
-    # Production: only show on Fridays after 14:00 EAT.
-    TRUE
+    if (is_dev_mode()) return(TRUE)
+    time <- as.POSIXct(app_now(), tz = "Africa/Addis_Ababa")
+    local <- as.POSIXlt(time, tz = "Africa/Addis_Ababa")
+    weekday <- local$wday
+    minutes <- local$hour * 60L + local$min
+    (weekday == 5L && minutes >= 13L * 60L) || (weekday == 6L && minutes < 17L * 60L)
   })
   
   # Dashboard period helpers. Request values/status counts follow order_date; actual paid spend follows payment_date.

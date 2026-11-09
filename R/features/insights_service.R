@@ -63,7 +63,7 @@
         make_card("card_status_waiting", "Under review", "under_review", "under_review", "magnifying-glass", "Awaiting review"),
         make_card("card_status_validation", "Pending", "pending", "pending", "clock", "In progress", extra_bottom = pending_badge),
         make_card("card_status_paid", "Paid", "paid", "paid", "circle-check",
-                  if (paid_week > 0) paste0("+", paid_week, " this week") else "Paid requests"),
+                  if (paid_week > 0) span(class = "kpi-card-sub-paid", paste0("+", paid_week, " this week")) else "Paid requests"),
         make_card("card_status_rejected", "Cancelled", "cancelled", "cancelled", "circle-xmark", "Closed requests"))
   })
   
@@ -414,6 +414,13 @@
       updateSelectInput(session, "dash_chart_select", selected = "days")
     }
   })
+
+  observeEvent(input$breakdown_status, {
+    val <- v(input$breakdown_status)
+    if (nzchar(val) && val %in% STATUS) {
+      insights_status_filter(val)
+    }
+  }, ignoreInit = TRUE)
 
   output$insights_footer <- renderUI({
     q <- insights_query()
