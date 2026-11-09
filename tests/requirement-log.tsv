@@ -158,3 +158,44 @@
 4	PASS	
 5	PARTIAL (manual)	Row click handler output confirmed; physical mouse click covered in MANUAL_CHECKLIST.md
 6	PARTIAL (manual)	Backdrop blur and sharp modal CSS contracts confirmed; visual verification in MANUAL_CHECKLIST.md
+22	PASS	Currency conversion unit math verified
+10	PASS	Page slicing logic verified
+15	PASS	Batch name validation unit rules verified
+17	PASS	No balance column exists in database schema or UI code
+19	PASS	Days to complete unit calculation verified
+1	PASS	Weekly window pure math verified
+2	PARTIAL (manual)	Weekly modal definition confirmed read-only in unit test; visual confirmation in MANUAL_CHECKLIST.md
+3b	PARTIAL (manual)	Field specifications validated; visual inspection covered in MANUAL_CHECKLIST.md
+4	PASS	Edit status preservation contract verified
+22	KNOWN BUG	requests table shows original currency instead of active currency
+22	PASS	
+7	PASS	
+8	PASS	
+9	PASS	
+10	PASS	Standard page length 10 verified across all modules
+11	PASS	Pagination reset logic verified
+12	PASS	
+13	PASS	
+14	PASS	
+15	PASS	
+16	PASS	
+18	PASS	
+19	PASS	
+20	PASS	
+21	PASS	
+1	KNOWN BUG	weekly_window_active() returns TRUE always instead of checking Friday 13:00 to Saturday 17:00 EAT window
+2	PARTIAL (manual)	Weekly detail modal handler triggered; visual inspection in MANUAL_CHECKLIST.md
+3	PASS	
+3b	PARTIAL (manual)	Modal generation templates include required fields; visual verification in MANUAL_CHECKLIST.md
+4	PASS	
+5	PARTIAL (manual)	Row click handler output confirmed; physical mouse click covered in MANUAL_CHECKLIST.md
+6	PARTIAL (manual)	Backdrop blur and sharp modal CSS contracts confirmed; visual verification in MANUAL_CHECKLIST.md
+22	PASS	Currency conversion unit math verified
+10	PASS	Page slicing logic verified
+15	PASS	Batch name validation unit rules verified
+17	PASS	No balance column exists in database schema or UI code
+19	PASS	Days to complete unit calculation verified
+1	PASS	Weekly window pure math verified
+2	PARTIAL (manual)	Weekly modal definition confirmed read-only in unit test; visual confirmation in MANUAL_CHECKLIST.md
+3b	PARTIAL (manual)	Field specifications validated; visual inspection covered in MANUAL_CHECKLIST.md
+4	PASS	Edit status preservation contract verified
