@@ -154,9 +154,10 @@
       x <- isolate(input[[id]])
       if (is.null(x)) character() else as.character(x)
     }
+    prev_mo <- last_month()
     current_month <- format(app_today(), "%Y-%m")
-    available_months <- unique(c(d$month, current_month))
-    month_selected <- isolate(input$f_month) %||% current_month
+    available_months <- unique(c(d$month, prev_mo, current_month))
+    month_selected <- isolate(input$f_month) %||% prev_mo
     if (identical(month_selected, "__none__")) month_selected <- ""
     month_opts <- month_choices(available_months)
     push_input("f_month",
@@ -280,11 +281,21 @@
     if (is.null(c_val) || !nzchar(c_val) || !c_val %in% CUR) "ETB" else c_val
   }
 
+  # Tables show the selected currency only. amount and currency stay as stored.
+  selected_amount_label <- function(d) {
+    cur <- active_currency()
+    n <- if (is.data.frame(d)) nrow(d) else 0L
+    if (!n) return(character())
+    vals <- if (cur %in% names(d)) suppressWarnings(as.numeric(d[[cur]])) else rep(NA_real_, n)
+    ifelse(is.na(vals), "", paste(cur, vapply(vals, money, character(1))))
+  }
+
   observeEvent(input$reset_dash_filter, {
+    prev_mo_date <- as.Date(format(app_today(), "%Y-%m-01")) - 1L
     updateSelectInput(session, "dash_period_type", selected = "month")
-    updateSelectInput(session, "dash_year", selected = format(app_today(), "%Y"))
-    updateSelectInput(session, "dash_month", selected = format(app_today(), "%m"))
-    updateSelectInput(session, "dash_quarter", selected = paste0("Q", ceiling(as.integer(format(app_today(), "%m")) / 3)))
+    updateSelectInput(session, "dash_year", selected = format(prev_mo_date, "%Y"))
+    updateSelectInput(session, "dash_month", selected = format(prev_mo_date, "%m"))
+    updateSelectInput(session, "dash_quarter", selected = paste0("Q", ceiling(as.integer(format(prev_mo_date, "%m")) / 3)))
     updateSelectizeInput(session, "dash_project", selected = character(0))
     updateSelectizeInput(session, "dash_department", selected = character(0))
     updateSelectInput(session, "breakdown_status", selected = "paid")
@@ -359,13 +370,14 @@
   dashboard_period_bounds <- function(offset = 0L) {
     period_type <- v(input$dash_period_type)
     if (!period_type %in% c("month", "quarter", "year")) period_type <- "month"
+    prev_mo_date <- as.Date(format(app_today(), "%Y-%m-01")) - 1L
     selected_year <- suppressWarnings(as.integer(v(input$dash_year)))
-    if (is.na(selected_year)) selected_year <- as.integer(format(app_today(), "%Y"))
+    if (is.na(selected_year)) selected_year <- as.integer(format(prev_mo_date, "%Y"))
     
     if (period_type == "month") {
       month_num <- suppressWarnings(as.integer(v(input$dash_month)))
       if (is.na(month_num) || month_num < 1 || month_num > 12) {
-        month_num <- as.integer(format(app_today(), "%m"))
+        month_num <- as.integer(format(prev_mo_date, "%m"))
       }
       selected_start <- as.Date(sprintf("%04d-%02d-01", selected_year, month_num))
       shift_month_start <- function(date, month_offset) {

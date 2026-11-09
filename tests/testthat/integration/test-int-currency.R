@@ -89,13 +89,20 @@ test_that("[22] Global currency switcher updates rates, Financial Updates, Insig
     unlink(tmp_xlsx)
   }
 
-  # 5. Requests table prints original currency (KNOWN BUG assertion)
+  # 5. Requests table and weekly report show the selected currency only.
+  # The stored amount and currency columns stay unchanged.
   shiny::testServer(tracker_insights_server, {
     session$setInputs(global_cur = "USD")
     session$flushReact()
     table_data <- filtered()
     anchor_row <- table_data[table_data$description == "ANCHOR-REVIEW", , drop = FALSE]
-    box$anchor_orig_cur <- anchor_row$currency[[1]]
+    box$anchor_stored_cur <- anchor_row$currency[[1]]
+    box$anchor_stored_amt <- anchor_row$amount[[1]]
+    box$anchor_label <- selected_amount_label(anchor_row)
+    weekly_anchor <- weekly_data()
+    weekly_anchor <- weekly_anchor[weekly_anchor$description == "ANCHOR-REVIEW", , drop = FALSE]
+    box$weekly_stored_cur <- weekly_anchor$currency[[1]]
+    box$weekly_label <- selected_amount_label(weekly_anchor)
   })
 
   expect_req("22", {
@@ -121,11 +128,14 @@ test_that("[22] Global currency switcher updates rates, Financial Updates, Insig
     expect_equal(box$export_cols, c("Project Code", "Budget Line", "Currency", "Paid Amount"))
     expect_equal(box$export_curr, "GBP")
 
-    # 5. Assert KNOWN BUG: requests table shows original currency instead of active currency
-    expect_failure({
-      expect_equal(box$anchor_orig_cur, "USD")
-    })
-    record_requirement("22", "KNOWN BUG", "requests table shows original currency instead of active currency")
+    # 5. Display uses the selected currency. Stored amount and currency stay put.
+    expect_equal(box$anchor_stored_cur, "ETB")
+    expect_equal(box$anchor_stored_amt, 1550)
+    expect_equal(box$anchor_label, paste("USD", money(10)))
+    expect_false(grepl("ETB", box$anchor_label))
+    expect_equal(box$weekly_stored_cur, "ETB")
+    expect_equal(box$weekly_label, paste("USD", money(10)))
+    expect_false(grepl("ETB", box$weekly_label))
   })
 })
 

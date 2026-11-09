@@ -721,8 +721,7 @@
       requested_by = blank(wd$requested_by),
       project      = blank(wd$project_code),
       budget_line  = blank(wd$budget_line),
-      amount       = ifelse(is.na(wd$amount), "",
-                            paste0(wd$currency, " ", vapply(wd$amount, money, character(1)))),
+      amount       = selected_amount_label(wd),
       status       = blank(wd$status),
       registered   = blank(substr(as.character(wd$created), 1, 10)),
       check.names  = FALSE

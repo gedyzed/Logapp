@@ -95,14 +95,14 @@ login_style <- "
   .panel-auth > .row {
     margin: 0 !important;
     width: 100% !important;
-    max-width: 400px !important;
+    max-width: min(50rem, 100%) !important;
     display: flex !important;
     justify-content: center !important;
   }
   
   .panel-auth > .row > div {
     width: 100% !important;
-    max-width: 400px !important;
+    max-width: min(45.0rem, 100%) !important;
     margin: 0 !important;
     padding: 0 !important;
     float: none !important;
@@ -112,13 +112,13 @@ login_style <- "
   /* White card styling */
   .panel-auth .panel-primary {
     background: #ffffff !important;
-    border: 1px solid #e4e4e7 !important;
-    border-radius: 20px !important;
-    box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05), 0 2px 6px -1px rgba(0, 0, 0, 0.02) !important;
+    border: 0.0625rem solid #e4e4e7 !important;
+    border-radius: 1.375rem !important;
+    box-shadow: 0 0.65rem 1.9rem -0.5rem rgba(15, 23, 42, 0.12), 0 0.125rem 0.5rem -0.125rem rgba(15, 23, 42, 0.06) !important;
     overflow: hidden !important;
     margin: 0 !important;
     width: 100% !important;
-    max-width: 400px !important;
+    max-width: min(45.0rem, 100%) !important;
   }
   
   .panel-auth .panel-heading {
@@ -126,8 +126,8 @@ login_style <- "
   }
   
   .panel-auth .panel-body {
-    background: #ffffff !important;
-    padding: 2.6rem 2.2rem 2.8rem 2.2rem !important;
+    background: #f4f4f5 !important;
+    padding: 3.46rem 3.15rem 3.78rem 3.15rem !important;
   }
   
   .panel-auth .panel-body > br {
@@ -137,12 +137,13 @@ login_style <- "
   /* Auth heading */
   #auth-shinymanager-auth-head {
     color: #0f172a !important;
-    font-size: 1.7rem !important;
-    font-weight: 600 !important;
-    letter-spacing: -0.02em !important;
-    margin: 1.25rem 0 1.6rem 0 !important;
+    font-size: 2.58rem !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.03em !important;
+    margin: 1.35rem 0 1.75rem 0 !important;
     text-align: center !important;
     font-family: inherit !important;
+    line-height: 1.2 !important;
   }
   
   /* Form groups */
@@ -160,9 +161,9 @@ login_style <- "
   /* Labels: Deep navy blue matching reference */
   .panel-auth .control-label {
     font-weight: 650 !important;
-    color: #1e3a8a !important;
-    font-size: 0.875rem !important;
-    margin-bottom: 0.45rem !important;
+    color: #1e293b !important;
+    font-size: 1.26rem !important;
+    margin-bottom: 0.5rem !important;
     display: block !important;
     text-align: left !important;
   }
@@ -170,21 +171,51 @@ login_style <- "
   /* Clean inputs with soft blue background */
   .panel-auth .form-control {
     background-color: #eff6ff !important;
-    border: 1px solid #bfdbfe !important;
-    border-radius: 10px !important;
-    padding: 0.75rem 1rem !important;
-    font-size: 0.95rem !important;
-    height: 3rem !important;
+    border: 0.0625rem solid #bfdbfe !important;
+    border-radius: 0.75rem !important;
+    padding: 1.02rem 1.26rem !important;
+    font-size: 1.3rem !important;
+    height: 4.24rem !important;
     color: #1e293b !important;
     background-image: none !important;
     box-shadow: none !important;
     transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease !important;
   }
+
+  .login-password-wrap {
+    position: relative !important;
+  }
+
+  .login-password-wrap .form-control {
+    padding-right: 3.25rem !important;
+  }
+
+  .login-password-toggle {
+    position: absolute !important;
+    right: 0.7rem !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    width: 2.25rem !important;
+    height: 2.25rem !important;
+    border: none !important;
+    background: transparent !important;
+    color: #64748b !important;
+    padding: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+    font-size: 1.62rem !important;
+  }
+
+  .login-password-toggle:hover {
+    color: #1d4ed8 !important;
+  }
   
   .panel-auth .form-control:focus {
     background-color: #ffffff !important;
     border-color: #2563eb !important;
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15) !important;
+    box-shadow: 0 0 0 0.2rem rgba(37, 99, 235, 0.15) !important;
     outline: none !important;
   }
   
@@ -202,13 +233,13 @@ login_style <- "
     border: none !important;
     color: #ffffff !important;
     font-weight: 600 !important;
-    border-radius: 10px !important;
-    padding: 0.75rem 1.5rem !important;
+    border-radius: 0.75rem !important;
+    padding: 1.02rem 1.8rem !important;
     width: 100% !important;
-    height: 3rem !important;
-    font-size: 1rem !important;
+    height: 4.24rem !important;
+    font-size: 1.3rem !important;
     transition: background-color 0.15s ease, transform 0.1s ease !important;
-    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+    box-shadow: 0 0.0625rem 0.125rem 0 rgba(0, 0, 0, 0.05) !important;
   }
   
   .panel-auth .btn-primary:hover {
@@ -223,8 +254,8 @@ login_style <- "
   /* Error / alert messages */
   #auth-result_auth .alert,
   .panel-auth .help-block {
-    border-radius: 8px !important;
-    font-size: 0.85rem !important;
+    border-radius: 0.5rem !important;
+    font-size: 1.02rem !important;
     margin-top: 0.75rem !important;
     margin-bottom: 0 !important;
   }
@@ -246,6 +277,27 @@ $(document).ready(function() {
     $('body').css('background-color', '#f4f4f5');
     $('.panel-auth').closest('.container-fluid').addClass('login-viewport-active');
   }
+  var eye = '<svg viewBox=\"0 0 24 24\" width=\"1em\" height=\"1em\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\"><path d=\"M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z\"></path><circle cx=\"12\" cy=\"12\" r=\"3\"></circle></svg>';
+  var eyeOff = '<svg viewBox=\"0 0 24 24\" width=\"1em\" height=\"1em\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\"><path d=\"M3 3l18 18\"></path><path d=\"M10.6 6.2A10.9 10.9 0 0 1 12 6c6.5 0 10 6 10 6a18.5 18.5 0 0 1-4.2 4.7\"></path><path d=\"M6.1 6.1C3.7 7.8 2 12 2 12s3.5 7 10 7c1.5 0 2.9-.3 4.2-.9\"></path><path d=\"M9.9 9.9a3 3 0 0 0 4.2 4.2\"></path></svg>';
+  var pwd = document.getElementById('auth-user_pwd');
+  if (!pwd || pwd.dataset.eyeReady) return;
+  pwd.dataset.eyeReady = '1';
+  var wrap = document.createElement('div');
+  wrap.className = 'login-password-wrap';
+  pwd.parentNode.insertBefore(wrap, pwd);
+  wrap.appendChild(pwd);
+  var btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'login-password-toggle';
+  btn.setAttribute('aria-label', 'Show password');
+  btn.innerHTML = eye;
+  btn.addEventListener('click', function() {
+    var show = pwd.type === 'password';
+    pwd.type = show ? 'text' : 'password';
+    btn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+    btn.innerHTML = show ? eyeOff : eye;
+  });
+  wrap.appendChild(btn);
 });
 "
 
@@ -265,11 +317,11 @@ secured_ui <- shinymanager::secure_app(
       class = "login-welcome-box",
       style = "text-align: left; margin-bottom: 1.85rem;",
       tags$div(
-        style = "color: #2563eb; font-weight: 700; font-size: 1.4rem; line-height: 1.25; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;",
+        style = "color: #2563eb; font-weight: 700; font-size: 2.04rem; line-height: 1.25; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;",
         "Welcome Back"
       ),
       tags$div(
-        style = "color: #6b7280; font-size: 0.875rem; margin-top: 0.35rem; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;",
+        style = "color: #6b7280; font-size: 1.26rem; margin-top: 0.48rem; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;",
         "Please enter your details to continue."
       )
     ),
@@ -279,9 +331,9 @@ secured_ui <- shinymanager::secure_app(
       style = "display: flex; align-items: center; justify-content: center; gap: 0.75rem; margin-bottom: 1.5rem;",
       # Blue rounded square with white L
       tags$div(
-        style = "width: 2.6rem; height: 2.6rem; border-radius: 10px; background: #2563eb; display: flex; align-items: center; justify-content: center; flex-shrink: 0;",
+        style = "width: 3.78rem; height: 3.78rem; border-radius: 0.9rem; background: #2563eb; display: flex; align-items: center; justify-content: center; flex-shrink: 0;",
         tags$span(
-          style = "color: #ffffff; font-weight: 700; font-size: 1.4rem; line-height: 1; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;",
+          style = "color: #ffffff; font-weight: 700; font-size: 2.04rem; line-height: 1; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;",
           "L"
         )
       ),
@@ -289,11 +341,11 @@ secured_ui <- shinymanager::secure_app(
       tags$div(
         style = "text-align: left;",
         tags$div(
-          style = "color: #2563eb; font-weight: 700; font-size: 1.25rem; line-height: 1.15; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;",
+          style = "color: #2563eb; font-weight: 700; font-size: 1.8rem; line-height: 1.15; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;",
           "Logapp"
         ),
         tags$div(
-          style = "color: #6b7280; font-size: 0.85rem; font-weight: 500; line-height: 1.15; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;",
+          style = "color: #6b7280; font-size: 1.2rem; font-weight: 500; line-height: 1.2; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;",
           "Expense Tracker"
         )
       )

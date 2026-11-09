@@ -159,6 +159,11 @@ app_today <- function() {
   as.Date(app_now(), tz = "Africa/Addis_Ababa")
 }
 
+last_month <- function(d = app_today()) {
+  first_of_curr <- as.Date(format(d, "%Y-%m-01"))
+  format(first_of_curr - 1L, "%Y-%m")
+}
+
 safe_date <- function(x) {
   if (is.null(x) || length(x) == 0) return(as.Date(NA))
   x <- as.character(x)

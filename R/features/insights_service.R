@@ -69,7 +69,7 @@
   
   # ---- Insights snapshot: the drawer edits a draft; Show results commits it ----
   insights_query <- reactiveVal(list(
-    month = format(app_today(), "%Y-%m"),
+    month = last_month(),
     projects = character(),
     department = "",
     scenario = ""
@@ -273,7 +273,7 @@
     if (!client_ready) {
       sel <- "all"
       dep_sel <- isolate(insights_query()$department %||% "")
-      month_sel <- isolate(insights_query()$month)
+      month_sel <- isolate(insights_query()$month %||% last_month())
       scen_sel <- isolate(insights_query()$scenario %||% "")
     } else {
       raw_project <- as.character(isolate(input$insights_project) %||% "")
@@ -295,9 +295,9 @@
     if (!nzchar(dep_sel) || identical(dep_sel, "__none__") || !dep_sel %in% deps) dep_sel <- ""
     if (!nzchar(scen_sel) || identical(scen_sel, "__none__") || !scen_sel %in% scen_vals) scen_sel <- ""
     month_opts <- month_choices(months)
-    if (!length(month_opts)) month_opts <- month_choices(format(app_today(), "%Y-%m"))
+    if (!length(month_opts)) month_opts <- month_choices(c(last_month(), format(app_today(), "%Y-%m")))
     month_opts <- c(c("All months" = ""), month_opts)
-    if (nzchar(month_sel) && !month_sel %in% as.character(month_opts)) month_sel <- format(app_today(), "%Y-%m")
+    if (nzchar(month_sel) && !month_sel %in% as.character(month_opts)) month_sel <- last_month()
     sig <- paste(paste(codes, collapse = "\n"), sel,
                  paste(deps, collapse = "\n"), dep_sel,
                  paste(scen_vals, collapse = "\n"), scen_sel,
@@ -1063,7 +1063,7 @@
       description = blank(d$description),
       project_code = blank(d$project_code),
       budget_line = blank(d$budget_line),
-      amount = ifelse(is.na(d$amount), "", paste0(d$currency, " ", vapply(d$amount, money, character(1)))),
+      amount = selected_amount_label(d),
       status = encoded_status,
       check.names = FALSE
     )
