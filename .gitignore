@@ -49,3 +49,6 @@ Thumbs.db
 # Python cache (harmless to ignore if not used)
 __pycache__/
 *.pyc
+
+.cursor/
+.vscode/
