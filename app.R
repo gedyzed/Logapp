@@ -33,6 +33,9 @@ source_module <- function(relative_path, envir = .GlobalEnv) {
 
 # Core setup loads packages, resolves the database, initializes the schema, and
 # exposes shared formatting, UI, and persistence helpers.
+if (file.exists(".Renviron")) {
+  try(readRenviron(".Renviron"), silent = TRUE)
+}
 source_module("R/core/config.R")
 source_module("R/core/contracts.R")
 source_module("R/core/db.R")
@@ -49,136 +52,173 @@ source_module("R/features/requests_page.R")
 
 # --- Custom login page matching reference design ---
 login_style <- "
-  /* Light gray-blue background */
-  body, html {
+  /* Center the login container & background */
+  html, body {
     margin: 0;
     padding: 0;
     width: 100%;
-    height: 100%;
-    background-color: #F5F9FE;
+    min-height: 100vh;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
   }
   
-  /* Center the login container */
-  .shinymanager-container {
-    background-color: #F5F9FE !important;
+  body:has(#auth-auth-mod) {
+    background-color: #f4f4f5 !important;
+  }
+  
+  body:has(#auth-auth-mod) > .container-fluid,
+  .login-viewport-active {
     min-height: 100vh !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    flex-direction: column !important;
-    padding: 2rem !important;
+    background-color: #f4f4f5 !important;
+    padding: 2.5rem 1rem !important;
   }
   
-  /* Center wrapper */
-  .shinymanager-container > div {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    width: 100%;
-    max-width: 420px;
-  }
-  
-  /* White login card */
+  /* Outer shinymanager container reset */
   .panel-auth {
-    background: #ffffff !important;
-    border: 1px solid #e5e7eb !important;
-    border-radius: 12px !important;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
-    overflow: visible !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
+    margin: 0 auto !important;
     width: 100% !important;
+    max-width: 440px !important;
+    padding: 0 !important;
+  }
+  
+  .panel-auth > br,
+  .panel-auth > div[style*='height: 70px'] {
+    display: none !important;
+  }
+  
+  .panel-auth > .row {
     margin: 0 !important;
   }
   
-  /* Remove default header */
+  .panel-auth > .row > div {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    flex: 0 0 100% !important;
+  }
+  
+  /* White card styling */
+  .panel-auth .panel-primary {
+    background: #ffffff !important;
+    border: 1px solid #e4e4e7 !important;
+    border-radius: 16px !important;
+    box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05), 0 2px 6px -1px rgba(0, 0, 0, 0.02) !important;
+    overflow: hidden !important;
+    margin: 0 !important;
+  }
+  
   .panel-auth .panel-heading {
     display: none !important;
   }
   
-  /* Card body styling */
   .panel-auth .panel-body {
     background: #ffffff !important;
-    padding: 2.5rem 2rem !important;
+    padding: 2.25rem 2.25rem 2.5rem 2.25rem !important;
+  }
+  
+  .panel-auth .panel-body > br {
+    display: none !important;
+  }
+  
+  /* Auth heading */
+  #auth-shinymanager-auth-head {
+    color: #09090b !important;
+    font-size: 1.45rem !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.02em !important;
+    margin: 0 0 1.5rem 0 !important;
+    text-align: center !important;
+    font-family: inherit !important;
   }
   
   /* Form groups */
+  #auth-user_input {
+    display: flex;
+    flex-direction: column;
+    gap: 1.1rem;
+    margin-bottom: 0.25rem;
+  }
+  
   .panel-auth .form-group {
-    margin-bottom: 1.5rem !important;
+    margin-bottom: 0 !important;
   }
   
-  /* Labels - dark navy */
-  .panel-auth .form-group label {
+  /* Labels */
+  .panel-auth .control-label {
     font-weight: 600 !important;
-    color: #1e3a8a !important;
+    color: #09090b !important;
     font-size: 0.875rem !important;
-    margin-bottom: 0.5rem !important;
+    margin-bottom: 0.45rem !important;
     display: block !important;
+    text-align: left !important;
   }
   
-  /* Input fields with icons */
+  /* Clean inputs with soft blue background */
   .panel-auth .form-control {
-    border: 1px solid #e5e7eb !important;
+    background-color: #eff6ff !important;
+    border: 1px solid #c7d7f8 !important;
     border-radius: 8px !important;
-    padding: 0.75rem 1rem 0.75rem 2.5rem !important;
+    padding: 0.65rem 0.95rem !important;
     font-size: 0.95rem !important;
-    height: 3rem !important;
-    transition: all 0.2s ease !important;
-    background-color: #ffffff !important;
-    color: #374151 !important;
+    height: 2.85rem !important;
+    color: #09090b !important;
+    background-image: none !important;
+    box-shadow: none !important;
+    transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease !important;
   }
   
   .panel-auth .form-control:focus {
-    border-color: #3b82f6 !important;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+    background-color: #ffffff !important;
+    border-color: #2563eb !important;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15) !important;
     outline: none !important;
   }
   
-  .panel-auth .form-control::placeholder {
-    color: #9ca3af !important;
+  /* Login button */
+  #auth-container-btn-ok {
+    margin-top: 1.25rem !important;
   }
   
-  /* Blue login button */
+  #auth-container-btn-ok > br {
+    display: none !important;
+  }
+  
   .panel-auth .btn-primary {
-    background: #3b82f6 !important;
+    background: #2563eb !important;
     border: none !important;
     color: #ffffff !important;
     font-weight: 600 !important;
     border-radius: 8px !important;
-    padding: 0.875rem 1.5rem !important;
+    padding: 0.75rem 1.5rem !important;
     width: 100% !important;
-    min-height: 3rem !important;
-    font-size: 1rem !important;
-    transition: all 0.2s ease !important;
-    margin-top: 0.5rem !important;
+    min-height: 2.85rem !important;
+    font-size: 0.95rem !important;
+    transition: background-color 0.15s ease, transform 0.1s ease !important;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
   }
   
   .panel-auth .btn-primary:hover {
-    background: #2563eb !important;
-  }
-  
-  .panel-auth .btn-primary:active {
     background: #1d4ed8 !important;
   }
   
-  /* Error message */
+  .panel-auth .btn-primary:active {
+    background: #1e40af !important;
+    transform: translateY(1px);
+  }
+  
+  /* Error / alert messages */
+  #auth-result_auth .alert,
   .panel-auth .help-block {
-    color: #dc2626 !important;
-    font-size: 0.875rem !important;
-    margin-top: 0.5rem !important;
-  }
-  
-  /* Add icons before input fields */
-  .panel-auth .form-group:nth-of-type(1) .form-control {
-    background-image: url('data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"%236b7280\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2\"></path><circle cx=\"12\" cy=\"7\" r=\"4\"></circle></svg>') !important;
-    background-repeat: no-repeat !important;
-    background-position: 0.75rem center !important;
-    background-size: 1rem !important;
-  }
-  
-  .panel-auth .form-group:nth-of-type(2) .form-control {
-    background-image: url('data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"%236b7280\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"3\" y=\"11\" width=\"18\" height=\"11\" rx=\"2\" ry=\"2\"></rect><path d=\"M7 11V7a5 5 0 0 1 10 0v4\"></path></svg>') !important;
-    background-repeat: no-repeat !important;
-    background-position: 0.75rem center !important;
-    background-size: 1rem !important;
+    border-radius: 8px !important;
+    font-size: 0.85rem !important;
+    margin-top: 0.75rem !important;
+    margin-bottom: 0 !important;
   }
   
   /* Logout button hover effect */
@@ -192,16 +232,12 @@ login_style <- "
   }
 "
 
-# JavaScript to move welcome text inside card
 login_js <- "
 $(document).ready(function() {
-  setTimeout(function() {
-    var welcomeText = $('#login-welcome-text');
-    var panelBody = $('.panel-auth .panel-body');
-    if (welcomeText.length && panelBody.length) {
-      panelBody.prepend(welcomeText);
-    }
-  }, 100);
+  if ($('.panel-auth').length) {
+    $('body').css('background-color', '#f4f4f5');
+    $('.panel-auth').closest('.container-fluid').addClass('login-viewport-active');
+  }
 });
 "
 
@@ -211,50 +247,47 @@ secured_ui <- shinymanager::secure_app(
   language = "en",
   choose_language = FALSE,
   fab_position = "none",
-  tags_top = tags$div(
+  tags_top = tagList(
     tags$head(
       tags$style(HTML(login_style)),
       tags$script(HTML(login_js))
     ),
-    # Logo above the card
+    # Top-left Welcome Back
     tags$div(
-      style = "text-align: center; margin-bottom: 2.5rem;",
-      # Logo icon and text
+      class = "login-welcome-box",
+      style = "text-align: left; margin-bottom: 1.5rem;",
       tags$div(
-        style = "display: flex; align-items: center; justify-content: center; gap: 0.75rem; margin-bottom: 0.5rem;",
-        # Blue rounded square with white L
-        tags$div(
-          style = "width: 3.5rem; height: 3.5rem; border-radius: 10px; background: #3b82f6; display: flex; align-items: center; justify-content: center;",
-          tags$span(
-            style = "color: #ffffff; font-weight: 700; font-size: 1.75rem; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;",
-            "L"
-          )
-        ),
-        # Logapp text
-        tags$div(
-          style = "text-align: left;",
-          tags$div(
-            style = "color: #1e3a8a; font-weight: 700; font-size: 1.5rem; line-height: 1.2; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;",
-            "Logapp"
-          ),
-          tags$div(
-            style = "color: #3b82f6; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.05em; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;",
-            "EXPENSE TRACKER"
-          )
-        )
-      )
-    ),
-    # Welcome text (will be moved inside the card by JavaScript)
-    tags$div(
-      id = "login-welcome-text",
-      style = "margin-bottom: 2rem;",
-      tags$h1(
-        style = "color: #1e3a8a; font-weight: 700; font-size: 1.75rem; margin: 0 0 0.5rem 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;",
+        style = "color: #2563eb; font-weight: 700; font-size: 1.35rem; line-height: 1.25; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;",
         "Welcome Back"
       ),
-      tags$p(
-        style = "color: #6b7280; font-size: 0.95rem; margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;",
+      tags$div(
+        style = "color: #71717a; font-size: 0.85rem; margin-top: 0.25rem; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;",
         "Please enter your details to continue."
+      )
+    ),
+    # Centered Logo and Brand Lockup
+    tags$div(
+      class = "login-brand-lockup",
+      style = "display: flex; align-items: center; justify-content: center; gap: 0.65rem; margin-bottom: 1.25rem;",
+      # Blue rounded square with white L
+      tags$div(
+        style = "width: 2.25rem; height: 2.25rem; border-radius: 8px; background: #2563eb; display: flex; align-items: center; justify-content: center; flex-shrink: 0;",
+        tags$span(
+          style = "color: #ffffff; font-weight: 700; font-size: 1.25rem; line-height: 1; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;",
+          "L"
+        )
+      ),
+      # Logapp & Expense Tracker text
+      tags$div(
+        style = "text-align: left;",
+        tags$div(
+          style = "color: #09090b; font-weight: 700; font-size: 1.05rem; line-height: 1.15; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;",
+          "Logapp"
+        ),
+        tags$div(
+          style = "color: #71717a; font-size: 0.75rem; font-weight: 500; line-height: 1.15; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;",
+          "Expense Tracker"
+        )
       )
     )
   ),
@@ -263,9 +296,10 @@ secured_ui <- shinymanager::secure_app(
 
 server <- function(input, output, session) {
   
-  # --- shinymanager authentication ---
+  # --- shinymanager authentication with session persistence on refresh ---
   auth_result <- shinymanager::secure_server(
-    check_credentials = shinymanager::check_credentials(AUTH_CREDENTIALS)
+    check_credentials = shinymanager::check_credentials(AUTH_CREDENTIALS),
+    keep_token = TRUE
   )
   
   # Log successful authentication
@@ -275,9 +309,14 @@ server <- function(input, output, session) {
     }
   })
   
-  # Handle logout - reload session to show login page
+  # Handle logout - invalidate shinymanager token, clear query string, and reload session
   observeEvent(input$logout_btn, {
-    # Clear authentication and reload
+    token <- tryCatch(shinymanager:::getToken(session = session), error = function(e) NULL)
+    if (!is.null(token)) {
+      try(shinymanager:::.tok$remove(token), silent = TRUE)
+    }
+    try(shinymanager:::clearQueryString(session = session), silent = TRUE)
+    shiny::updateQueryString("?", mode = "replace", session = session)
     session$reload()
   })
   

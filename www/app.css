@@ -1,14 +1,1 @@
-<<<<<<< HEAD
 /* Shared stylesheet placeholder. Live theme rules stay in R/core/components.R. */
-=======
-/*
-STRUCTURAL PLACEHOLDER - NOT IMPLEMENTED
-File: www/app.css
-Owner: Dagim
-Purpose: Implement shared responsive styling and semantic light/dark tokens.
-Expected code: Scoped CSS for shell, sidebar, cards, tables, modals, focus and theme variables.
-Connections: Pairs with theme.R/components and page-specific class names.
-Boundary: No business rules, external secrets, hard-coded light-only surfaces or per-page duplicate palettes. Add JavaScript only if a real requirement cannot be met by Shiny/bslib.
-Read docs/PRODUCT_SPECIFICATION.md, docs/DATABASE_DESIGN.md and docs/FILE_STRUCTURE.md before implementation.
-*/
->>>>>>> 46df1a52aa40976879d44a40e1e7964b5d18a824

@@ -1048,6 +1048,12 @@ $(document).on('click', '#copy_link', function() {
   else document.execCommand('copy');
   $(this).text('Copied');
 });
+// Clean query string and history on logout
+$(document).on('click', '#logout_btn', function() {
+  if (window.history && window.history.replaceState) {
+    window.history.replaceState(null, null, window.location.pathname);
+  }
+});
 $(document).on('shiny:connected', function() {
   Shiny.addCustomMessageHandler('badge', function(m) {
     $('#fcount').text(m.n).css('display', m.n > 0 ? 'inline-block' : 'none');

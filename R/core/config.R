@@ -130,7 +130,14 @@ DIMS <- c(Project = "project_code", Requester = "requested_by",
 `%||%` <- function(a, b) if (is.null(a)) b else a
 
 is_dev_mode <- function() {
-  val <- tolower(trimws(Sys.getenv("DEV", unset = Sys.getenv("dev", unset = "FALSE"))))
+  if (!nzchar(Sys.getenv("DEV", unset = "")) && file.exists(".Renviron")) {
+    try(readRenviron(".Renviron"), silent = TRUE)
+  }
+  opt <- getOption("dev", getOption("DEV", NULL))
+  if (isTRUE(opt) || identical(opt, "TRUE") || identical(opt, "true") || identical(opt, 1) || identical(opt, 1L)) {
+    return(TRUE)
+  }
+  val <- tolower(trimws(Sys.getenv("DEV", unset = Sys.getenv("dev", unset = Sys.getenv("DEV_MODE", unset = "FALSE")))))
   val %in% c("true", "1", "t", "yes")
 }
 
