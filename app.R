@@ -54,52 +54,58 @@ source_module("R/features/requests_page.R")
 login_style <- "
   /* Center the login container & background */
   html, body {
-    margin: 0;
-    padding: 0;
-    width: 100%;
-    min-height: 100vh;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    background-color: #f4f4f5 !important;
+    overflow-x: hidden !important;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
   }
   
-  body:has(#auth-auth-mod) {
+  /* Make shinymanager panel-auth the fixed centered flex viewport */
+  .panel-auth {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
     background-color: #f4f4f5 !important;
-  }
-  
-  body:has(#auth-auth-mod) > .container-fluid,
-  .login-viewport-active {
-    min-height: 100vh !important;
+    z-index: 99997 !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    background-color: #f4f4f5 !important;
-    padding: 2.5rem 1rem !important;
-  }
-  
-  /* Outer shinymanager container reset */
-  .panel-auth {
-    background: transparent !important;
-    box-shadow: none !important;
+    padding: 2rem 1rem !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
     border: none !important;
-    margin: 0 auto !important;
-    width: 100% !important;
-    max-width: 440px !important;
-    padding: 0 !important;
+    box-shadow: none !important;
   }
   
+  /* Remove default top spacer elements from shinymanager */
   .panel-auth > br,
-  .panel-auth > div[style*='height: 70px'] {
+  .panel-auth > div[style*='height'] {
     display: none !important;
   }
   
   .panel-auth > .row {
     margin: 0 !important;
+    width: 100% !important;
+    max-width: 440px !important;
+    display: flex !important;
+    justify-content: center !important;
   }
   
   .panel-auth > .row > div {
     width: 100% !important;
-    max-width: 100% !important;
+    max-width: 440px !important;
     margin: 0 !important;
     padding: 0 !important;
+    float: none !important;
     flex: 0 0 100% !important;
   }
   
