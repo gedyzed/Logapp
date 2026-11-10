@@ -307,6 +307,7 @@ body{background:var(--app-bg);color:var(--bs-body-color);font-size:.92rem;font-w
 .navbar .nav-link[data-value='new'],.navbar .nav-link[data-value='manage']{display:none!important}
 .navbar .navbar-brand,a.brand{display:inline-flex!important;flex-direction:row!important;align-items:center!important;gap:.55rem!important;white-space:nowrap;color:var(--nav-fg)!important;text-decoration:none;line-height:1}
 .brand-mark{width:2.15rem;height:2.15rem;flex:0 0 auto;border-radius:.5rem;background:#0284C7;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:.95rem;letter-spacing:-.04em}
+img.brand-mark{background:transparent!important;object-fit:contain;display:block}
 .brand-copy{display:flex!important;flex-direction:column!important;align-items:flex-start;justify-content:center;line-height:1;width:auto}
 .brand-name{display:block;font-weight:700;letter-spacing:-.03em;font-size:1rem;line-height:1.05;color:#fff}
 .brand-sub{display:block;margin-top:.14rem;font-size:.48rem;font-weight:600;letter-spacing:.08em;line-height:1;text-transform:uppercase;color:rgba(255,255,255,.72);white-space:nowrap}

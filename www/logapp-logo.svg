@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Navy Canvas Tile -->
+  <rect width="128" height="128" rx="28" fill="#253444" />
+
+  <!-- Bar 1: Muted Blue -->
+  <rect x="18" y="86" width="20" height="20" rx="6" fill="#364E65" />
+
+  <!-- Bar 2: Primary Blue -->
+  <rect x="54" y="66" width="20" height="40" rx="6" fill="#0082CD" />
+
+  <!-- Bar 3: Primary Blue -->
+  <rect x="90" y="46" width="20" height="60" rx="6" fill="#0082CD" />
+
+  <!-- Lifted White Arrow (Clear separation from Bar 3) -->
+  <path d="M 26 48 L 49 27 L 64 43 L 94 14" 
+        fill="none" 
+        stroke="#FFFFFF" 
+        stroke-width="11" 
+        stroke-linecap="round" 
+        stroke-linejoin="round" />
+  <path d="M 73 14 H 94 V 33" 
+        fill="none" 
+        stroke="#FFFFFF" 
+        stroke-width="11" 
+        stroke-linecap="round" 
+        stroke-linejoin="round" />
+</svg>

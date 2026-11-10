@@ -3,7 +3,7 @@ ui <- function(request) {
   page_navbar(
     id = "nav", selected = "requests", fillable = FALSE,
     title = tags$a(href = ".", class = "brand brand-lockup",
-                   span(class = "brand-mark", "L"),
+                   tags$img(src = "logapp-logo.svg", class = "brand-mark", alt = "Logapp"),
                    span(class = "brand-copy",
                         span(class = "brand-name", "Logapp"),
                         span(class = "brand-sub", "Expense tracker"))),

@@ -1,144 +1,139 @@
-%% Relationship overview; full fields, nullability and composite constraints: DATABASE_DESIGN.md
 erDiagram
-    budgets ||--o{ budget_lines : "1 : 0..N"
-    budget_lines ||--o{ requests : "1 : 0..N"
-    areas ||--o{ requests : "1 : 0..N"
-    contacts ||--o{ requests : "required requester"
-    contacts o|--o{ requests : "optional focal"
-    contacts o|--o{ requests : "supplier assigned at approval"
-    requests ||--|{ request_state_events : "1 : 1..N"
-    requests ||--o| payment_events : "1 : 0..1"
-    fx_rate_sets ||--|{ fx_rates : "1 : 4 when published"
-    fx_rate_sets o|--o{ requests : "optional entry rate set"
-    fx_rate_sets ||--o{ payment_events : "1 : 0..N"
-    budgets ||--o{ payment_events : "snapshot budget"
-    budget_lines ||--o{ payment_events : "snapshot line"
-    checkpoint_batches ||--|{ checkpoint_budgets : "1 : 1..N"
-    budgets ||--o{ checkpoint_budgets : "historical memberships"
-    checkpoint_budgets ||--|{ checkpoint_lines : "1 : 1..N"
-    budget_lines ||--o{ checkpoint_lines : "historical line totals"
-    checkpoint_lines ||--|{ checkpoint_items : "1 : 1..N"
-    payment_events ||--o{ checkpoint_items : "historical memberships"
-    weekly_notification_runs ||--o{ email_deliveries : "1 : 0..N"
-    email_recipients ||--o{ email_deliveries : "1 : 0..N"
-    budgets {
-        uuid id PK
-        string code UK
-        boolean active
+    projects ||--o{ budget_lines : "1 : 0..N"
+    budget_lines ||--o{ expenses : "1 : 0..N"
+    expenses ||--o| payment_events : "1 : 0..1"
+    expenses ||--|{ request_state_events : "1 : 1..N"
+    currencies ||--o{ expenses : "currency"
+    currencies ||--o{ payment_events : "rate applied"
+    suppliers o|--o{ expenses : "supplier"
+    people o|--o{ expenses : "requested_by"
+
+    projects {
+        integer id PK
+        string project_code UK
+        string department
+        string location
+        string last_deducted_at
+        string created
+        string updated
     }
+
     budget_lines {
-        uuid id PK
-        uuid budget_id FK
-        string code
+        integer id PK
+        integer project_id FK
+        string budget_line_code
+        string created
+        string updated
     }
-    areas {
-        uuid id PK
-        string code UK
-        string country_code
-    }
-    contacts {
-        uuid id PK
-        string kind
-        string display_name
-    }
-    requests {
-        uuid id PK
-        uuid submission_key UK
-        uuid budget_line_id FK
-        uuid area_id FK
-        uuid requester_id FK
-        uuid focal_id FK
-        uuid supplier_id FK
-        uuid entry_rate_set_id FK
+
+    expenses {
+        integer id PK
+        integer budget_line_id FK
+        string description
+        string order_form
+        string po
+        string requested_by
+        string submitted_by
+        string supplier
         string status
-        timestamp registered_at
-        timestamp pending_entered_at
-        timestamp pending_exited_at
+        string currency FK
+        real amount
+        real usd
+        real rate_used
+        string order_date
+        string po_date
+        string payment_date
+        string remarks
+        string created
+        string updated
     }
-    request_state_events {
-        uuid id PK
-        uuid request_id FK
-        string to_status
-        timestamp occurred_at
-    }
-    fx_rate_sets {
-        uuid id PK
-        date effective_date
-        string buying_type
-        timestamp published_at
-    }
-    fx_rates {
-        uuid rate_set_id PK, FK
-        string currency PK
-        numeric etb_per_unit
-    }
+
     payment_events {
-        uuid id PK
-        uuid request_id FK, UK
-        uuid budget_id FK
-        uuid budget_line_id FK
-        uuid rate_set_id FK
-        numeric usd_value
-        date payment_date
+        integer id PK
+        integer expense_id FK, UK
+        string payment_date
+        string rate_month
+        string original_currency
+        real original_amount
+        real etb_value
+        real usd_value
+        real eur_value
+        real gbp_value
+        string recorded_at
     }
-    checkpoint_batches {
-        uuid id PK
-        string reference UK
-        string status
+
+    request_state_events {
+        integer id PK
+        integer expense_id FK
+        string from_status
+        string to_status
+        string occurred_at
+        string remarks
+    }
+
+    currencies {
+        integer id PK
+        string rate_month
+        string code
+        real rate_to_eur
+        real eur_per_unit
+        real usd_per_unit
+        real gbp_per_unit
+        real etb_per_unit
+        integer active
+        string source
+        string updated_at
+    }
+
+    financial_batches {
+        integer id PK
+        string batch_code UK
+        string batch_name
+        string project_codes
+        string request_ids
+        real total_amount
         string currency
-        timestamp sealed_at
-        timestamp applied_at
-    }
-    checkpoint_budgets {
-        uuid batch_id PK, FK
-        uuid budget_id PK, FK
-        timestamp reservation_released_at
-    }
-    checkpoint_lines {
-        uuid batch_id PK, FK
-        uuid budget_line_id PK, FK
-        uuid budget_id FK
-        numeric raw_usd_total
-        numeric usd_total
-    }
-    checkpoint_items {
-        uuid id PK
-        uuid batch_id FK
-        uuid budget_id FK
-        uuid budget_line_id FK
-        uuid payment_event_id FK
-        timestamp released_at
-    }
-    email_recipients {
-        uuid id PK
-        string normalized_email UK
-        boolean active
-    }
-    weekly_notification_runs {
-        uuid id PK
-        date period_key UK
-        timestamp period_start
-        timestamp period_end
-    }
-    email_deliveries {
-        uuid id PK
-        uuid run_id FK
-        uuid recipient_id FK
         string status
-        timestamp accepted_at
+        string created
+        string confirmed_at
     }
-    audit_events {
-        uuid id PK
-        string entity_type
-        uuid entity_id
-        string action
+
+    suppliers {
+        integer id PK
+        string supplier_name UK
+        string email
+        string phone
+        string notes
+        integer active
+        string created
+        string updated
     }
-    app_settings {
-        smallint id PK
-        bigint data_revision
-        integer pending_overdue_hours
+
+    people {
+        integer id PK
+        string full_name UK
+        string email UK
+        string department
+        integer active
+        string created
+        string updated
     }
-    schema_migrations {
-        integer version PK
-        string checksum
+
+    notification_emails {
+        integer id PK
+        string email UK
+        integer weekly_report
+        integer active
+        string last_sent_period
+        string last_sent_at
+        string last_status
+        string last_error
+        string created
+        string updated
+    }
+
+    app_defaults {
+        string setting_key PK
+        string setting_value
+        string updated
     }

@@ -432,23 +432,9 @@
 
   observeEvent(input$open_request_row, {
     id <- suppressWarnings(as.integer(input$open_request_row$id))
-    # #region agent log
-    try(cat(sprintf("{\"sessionId\":\"3d2873\",\"hypothesisId\":\"H1\",\"location\":\"requests_modals.R:open_request_row\",\"message\":\"row click\",\"data\":{\"detail\":\"id=%s status_label=%s\"},\"timestamp\":%s,\"runId\":\"pre\"}\n",
-                    paste(id, collapse = ","), exists("status_label", mode = "function"),
-                    format(as.numeric(Sys.time()) * 1000, scientific = FALSE, digits = 15)),
-             file = "c:/Users/Staff/OneDrive - ACTED/Documents/Projects/expense-tracker-acted/.cursor/debug-3d2873.log", append = TRUE), silent = TRUE)
-    # #endregion
     if (length(id) != 1L || is.na(id)) { showNotification("Could not identify that request.", type = "warning"); return() }
     edit_id(id)
-    tryCatch(render_request_modal(id, edit_mode = FALSE), error = function(e) {
-      # #region agent log
-      try(cat(sprintf("{\"sessionId\":\"3d2873\",\"hypothesisId\":\"H1\",\"location\":\"requests_modals.R:render_request_modal\",\"message\":\"modal failed\",\"data\":{\"detail\":\"%s\"},\"timestamp\":%s,\"runId\":\"pre\"}\n",
-                      gsub("\"", "'", conditionMessage(e)),
-                      format(as.numeric(Sys.time()) * 1000, scientific = FALSE, digits = 15)),
-               file = "c:/Users/Staff/OneDrive - ACTED/Documents/Projects/expense-tracker-acted/.cursor/debug-3d2873.log", append = TRUE), silent = TRUE)
-      # #endregion
-      stop(e)
-    })
+    render_request_modal(id, edit_mode = FALSE)
   })
   observeEvent(input$start_edit_modal, {
     id <- edit_id()
