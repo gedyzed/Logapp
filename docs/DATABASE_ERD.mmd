@@ -1,73 +1,98 @@
 erDiagram
-    projects ||--o{ budget_lines : "1 : 0..N"
-    budget_lines ||--o{ expenses : "1 : 0..N"
-    expenses ||--o| payment_events : "1 : 0..1"
-    expenses ||--|{ request_state_events : "1 : 1..N"
-    currencies ||--o{ expenses : "currency"
+    project_budgets ||--o{ budget_lines : "1 : 0..N"
+    budget_lines ||--o{ requests : "1 : 0..N"
+    areas ||--o{ requests : "area_id FK"
+    requests ||--o| payment_events : "1 : 0..1"
+    requests ||--|{ request_state_events : "1 : 1..N"
+    currencies ||--o{ requests : "currency"
     currencies ||--o{ payment_events : "rate applied"
-    suppliers o|--o{ expenses : "supplier"
-    people o|--o{ expenses : "requested_by"
+    suppliers o|--o{ requests : "supplier_id FK"
+    peoples o|--o{ requests : "requester_id FK"
+    financial_batches ||--|{ batch_projects : "1 : 1..N"
+    project_budgets ||--o{ batch_projects : "project_budget_id FK"
+    financial_batches ||--|{ batch_items : "1 : 1..N"
+    payment_events ||--o{ batch_items : "payment_event_id FK"
+    weekly_notification_runs ||--o{ email_deliveries : "1 : 0..N"
+    email_recipients ||--o{ email_deliveries : "recipient_id FK"
 
-    projects {
+    project_budgets {
         integer id PK
-        string project_code UK
+        string code UK
+        string name
         string department
-        string location
-        string last_deducted_at
-        string created
-        string updated
+        string last_checkpoint_at
+        string created_at
+        string updated_at
+    }
+
+    areas {
+        integer id PK
+        string code UK
+        string name
+        string country_code
+        string created_at
+        string updated_at
     }
 
     budget_lines {
         integer id PK
-        integer project_id FK
-        string budget_line_code
-        string created
-        string updated
+        integer project_budget_id FK
+        string code
+        string description
+        string created_at
+        string updated_at
     }
 
-    expenses {
+    requests {
         integer id PK
+        string submission_key UK
         integer budget_line_id FK
+        integer area_id FK
+        integer requester_id FK
+        integer supplier_id FK
+        string request_reference UK
+        string po_reference
         string description
-        string order_form
-        string po
-        string requested_by
-        string submitted_by
-        string supplier
         string status
         string currency FK
-        real amount
-        real usd
-        real rate_used
-        string order_date
-        string po_date
-        string payment_date
+        numeric amount
+        numeric usd
+        string procurement_scenario
+        integer expected_days
+        string due_date
+        date order_date
+        date po_date
         string remarks
-        string created
-        string updated
+        timestamp registered_at
+        timestamp pending_entered_at
     }
 
     payment_events {
         integer id PK
-        integer expense_id FK, UK
-        string payment_date
-        string rate_month
+        integer request_id FK
+        integer project_budget_id FK
+        integer budget_line_id FK
+        date payment_date
         string original_currency
-        real original_amount
-        real etb_value
-        real usd_value
-        real eur_value
-        real gbp_value
-        string recorded_at
+        numeric original_amount
+        numeric etb_value
+        numeric usd_value
+        numeric eur_value
+        numeric gbp_value
+        string payment_method
+        string remarks
+        timestamp recorded_at
     }
 
     request_state_events {
         integer id PK
-        integer expense_id FK
+        integer request_id FK
         string from_status
         string to_status
-        string occurred_at
+        real actual_days
+        real delay_days
+        boolean is_delayed
+        timestamp occurred_at
         string remarks
     }
 
@@ -75,11 +100,11 @@ erDiagram
         integer id PK
         string rate_month
         string code
-        real rate_to_eur
-        real eur_per_unit
-        real usd_per_unit
-        real gbp_per_unit
-        real etb_per_unit
+        numeric rate_to_eur
+        numeric eur_per_unit
+        numeric usd_per_unit
+        numeric gbp_per_unit
+        numeric etb_per_unit
         integer active
         string source
         string updated_at
@@ -88,14 +113,27 @@ erDiagram
     financial_batches {
         integer id PK
         string batch_code UK
-        string batch_name
-        string project_codes
-        string request_ids
-        real total_amount
-        string currency
         string status
-        string created
-        string confirmed_at
+        numeric total_usd
+        string remarks
+        timestamp prepared_at
+        timestamp applied_at
+        timestamp abandoned_at
+    }
+
+    batch_projects {
+        integer id PK
+        integer batch_id FK
+        integer project_budget_id FK
+        boolean is_active
+    }
+
+    batch_items {
+        integer id PK
+        integer batch_id FK
+        integer payment_event_id FK
+        numeric usd_amount
+        boolean is_active
     }
 
     suppliers {
@@ -105,35 +143,63 @@ erDiagram
         string phone
         string notes
         integer active
-        string created
-        string updated
+        string created_at
+        string updated_at
     }
 
-    people {
+    peoples {
         integer id PK
-        string full_name UK
+        string full_name
         string email UK
         string department
         integer active
-        string created
-        string updated
+        string created_at
+        string updated_at
     }
 
-    notification_emails {
+    email_recipients {
         integer id PK
+        string display_name
         string email UK
-        integer weekly_report
-        integer active
-        string last_sent_period
-        string last_sent_at
-        string last_status
-        string last_error
-        string created
-        string updated
+        boolean active
+        timestamp created_at
+        timestamp updated_at
+        timestamp deactivated_at
     }
 
-    app_defaults {
-        string setting_key PK
-        string setting_value
-        string updated
+    weekly_notification_runs {
+        integer id PK
+        date period_key UK
+        timestamp period_start
+        timestamp period_end
+        string business_timezone
+        time cutoff_local
+        timestamp created_at
+    }
+
+    email_deliveries {
+        integer id PK
+        integer run_id FK
+        integer recipient_id FK
+        string status
+        integer attempt_count
+        timestamp last_attempt_at
+        timestamp accepted_at
+        string error_message
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    settings {
+        integer id PK
+        string business_timezone
+        time weekly_cutoff_local
+        string default_currency
+        string finance_currency
+        integer fx_max_age_days
+        integer pending_overdue_hours
+        integer notification_catchup_hours
+        string application_base_url
+        bigint data_revision
+        timestamp updated_at
     }
