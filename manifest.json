@@ -1,0 +1,1499 @@
+{
+  "version": 1,
+  "locale": "en_US",
+  "platform": "4.6.1",
+  "metadata": {
+    "appmode": "shiny",
+    "primary_rmd": null,
+    "primary_html": null,
+    "content_category": null,
+    "has_parameters": false
+  },
+  "packages": {
+    "DBI": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "DBI",
+        "Version": "1.3.0",
+        "Depends": "methods, R (>= 3.0.0)",
+        "NeedsCompilation": "no",
+        "RemoteType": "standard",
+        "RemotePkgRef": "DBI",
+        "RemoteRef": "DBI",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "1.3.0"
+      }
+    },
+    "DT": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "DT",
+        "Version": "0.34.0",
+        "Imports": "crosstalk, htmltools (>= 0.3.6), htmlwidgets (>= 1.3),\njquerylib, jsonlite (>= 0.9.16), magrittr, promises",
+        "NeedsCompilation": "no",
+        "RemoteType": "standard",
+        "RemotePkgRef": "DT",
+        "RemoteRef": "DT",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "0.34.0"
+      }
+    },
+    "R.methodsS3": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "R.methodsS3",
+        "Version": "1.8.2",
+        "Depends": "R (>= 2.13.0)",
+        "Imports": "utils",
+        "NeedsCompilation": "no",
+        "RemoteType": "standard",
+        "RemotePkgRef": "R.methodsS3",
+        "RemoteRef": "R.methodsS3",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "1.8.2"
+      }
+    },
+    "R.oo": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "R.oo",
+        "Version": "1.27.1",
+        "Depends": "R (>= 2.13.0), R.methodsS3 (>= 1.8.2)",
+        "Imports": "methods, utils",
+        "NeedsCompilation": "no",
+        "RemoteType": "standard",
+        "RemotePkgRef": "R.oo",
+        "RemoteRef": "R.oo",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "1.27.1"
+      }
+    },
+    "R.utils": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "R.utils",
+        "Version": "2.13.0",
+        "Depends": "R (>= 2.14.0), R.oo",
+        "Imports": "methods, utils, tools, R.methodsS3",
+        "NeedsCompilation": "no",
+        "RemoteType": "standard",
+        "RemotePkgRef": "R.utils",
+        "RemoteRef": "R.utils",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "2.13.0"
+      }
+    },
+    "R6": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "R6",
+        "Version": "2.6.1",
+        "Depends": "R (>= 3.6)",
+        "NeedsCompilation": "no",
+        "RemoteType": "standard",
+        "RemotePkgRef": "R6",
+        "RemoteRef": "R6",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "2.6.1"
+      }
+    },
+    "RColorBrewer": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "RColorBrewer",
+        "Version": "1.1-3",
+        "Depends": "R (>= 2.0.0)",
+        "NeedsCompilation": "no",
+        "RemoteType": "standard",
+        "RemotePkgRef": "RColorBrewer",
+        "RemoteRef": "RColorBrewer",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "1.1-3"
+      }
+    },
+    "RPostgres": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "RPostgres",
+        "Version": "1.4.10",
+        "Depends": "R (>= 3.1.0)",
+        "Imports": "bit64, blob (>= 1.2.0), DBI (>= 1.2.0), hms (>= 1.0.0),\nlubridate, methods, withr",
+        "LinkingTo": "cpp11",
+        "NeedsCompilation": "yes"
+      }
+    },
+    "RSQLite": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "RSQLite",
+        "Version": "3.53.3",
+        "Depends": "R (>= 3.1.0)",
+        "Imports": "bit64, blob (>= 1.2.0), DBI (>= 1.2.0), memoise, methods,\npkgconfig, rlang",
+        "LinkingTo": "cpp11 (>= 0.4.0)",
+        "NeedsCompilation": "yes",
+        "RemoteType": "standard",
+        "RemotePkgRef": "RSQLite",
+        "RemoteRef": "RSQLite",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "3.53.3"
+      }
+    },
+    "Rcpp": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "Rcpp",
+        "Version": "1.1.2",
+        "Depends": "R (>= 3.5.0)",
+        "Imports": "methods, utils",
+        "NeedsCompilation": "yes"
+      }
+    },
+    "S7": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "S7",
+        "Version": "0.2.2",
+        "Depends": "R (>= 3.5.0)",
+        "Imports": "utils",
+        "NeedsCompilation": "yes",
+        "RemoteType": "standard",
+        "RemotePkgRef": "S7",
+        "RemoteRef": "S7",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "0.2.2"
+      }
+    },
+    "askpass": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "askpass",
+        "Version": "1.2.1",
+        "Imports": "sys (>= 2.1)",
+        "NeedsCompilation": "yes",
+        "RemoteType": "standard",
+        "RemotePkgRef": "askpass",
+        "RemoteRef": "askpass",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "1.2.1"
+      }
+    },
+    "base64enc": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "base64enc",
+        "Version": "0.1-6",
+        "Depends": "R (>= 2.9.0)",
+        "NeedsCompilation": "yes",
+        "RemoteType": "standard",
+        "RemotePkgRef": "base64enc",
+        "RemoteRef": "base64enc",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "0.1-6"
+      }
+    },
+    "billboarder": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "billboarder",
+        "Version": "0.5.2",
+        "Depends": "R (>= 3.1.0)",
+        "Imports": "htmlwidgets, htmltools, magrittr, jsonlite, ggplot2, scales,\nshiny, rlang",
+        "NeedsCompilation": "no",
+        "RemoteType": "standard",
+        "RemotePkgRef": "billboarder",
+        "RemoteRef": "billboarder",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "0.5.2"
+      }
+    },
+    "bit": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "bit",
+        "Version": "4.6.0",
+        "Depends": "R (>= 3.4.0)",
+        "NeedsCompilation": "yes",
+        "RemoteType": "standard",
+        "RemotePkgRef": "bit",
+        "RemoteRef": "bit",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "4.6.0"
+      }
+    },
+    "bit64": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "bit64",
+        "Version": "4.8.6",
+        "Depends": "R (>= 3.5.0)",
+        "Imports": "bit (>= 4.0.0), graphics, methods, stats, utils",
+        "NeedsCompilation": "yes",
+        "RemoteType": "standard",
+        "RemotePkgRef": "bit64",
+        "RemoteRef": "bit64",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "4.8.6"
+      }
+    },
+    "blob": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "blob",
+        "Version": "1.3.0",
+        "Imports": "methods, rlang, vctrs (>= 0.2.1)",
+        "NeedsCompilation": "no",
+        "RemoteType": "standard",
+        "RemotePkgRef": "blob",
+        "RemoteRef": "blob",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "1.3.0"
+      }
+    },
+    "brio": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "brio",
+        "Version": "1.1.5",
+        "Depends": "R (>= 3.6)",
+        "NeedsCompilation": "yes",
+        "RemoteType": "standard",
+        "RemotePkgRef": "brio",
+        "RemoteRef": "brio",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "1.1.5"
+      }
+    },
+    "bslib": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "bslib",
+        "Version": "0.12.0",
+        "Depends": "R (>= 2.10)",
+        "Imports": "base64enc, cachem, fastmap (>= 1.1.1), grDevices, htmltools\n(>= 0.5.8), jquerylib (>= 0.1.3), jsonlite, lifecycle, memoise\n(>= 2.0.1), mime, rlang, sass (>= 0.4.9)",
+        "NeedsCompilation": "no",
+        "RemoteType": "standard",
+        "RemotePkgRef": "bslib",
+        "RemoteRef": "bslib",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "0.12.0"
+      }
+    },
+    "cachem": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "cachem",
+        "Version": "1.1.0",
+        "Imports": "rlang, fastmap (>= 1.2.0)",
+        "NeedsCompilation": "yes",
+        "RemoteType": "standard",
+        "RemotePkgRef": "cachem",
+        "RemoteRef": "cachem",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "1.1.0"
+      }
+    },
+    "callr": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "callr",
+        "Version": "3.8.0",
+        "Depends": "R (>= 3.4)",
+        "Imports": "otel (>= 0.2.0), processx (>= 3.6.1), R6, utils",
+        "NeedsCompilation": "no",
+        "RemoteType": "standard",
+        "RemotePkgRef": "callr",
+        "RemoteRef": "callr",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "3.8.0"
+      }
+    },
+    "cli": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "cli",
+        "Version": "3.6.6",
+        "Depends": "R (>= 3.4)",
+        "Imports": "utils",
+        "NeedsCompilation": "yes",
+        "RemoteType": "standard",
+        "RemotePkgRef": "cli",
+        "RemoteRef": "cli",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "3.6.6"
+      }
+    },
+    "commonmark": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "commonmark",
+        "Version": "2.0.0",
+        "NeedsCompilation": "yes",
+        "RemoteType": "standard",
+        "RemotePkgRef": "commonmark",
+        "RemoteRef": "commonmark",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "2.0.0"
+      }
+    },
+    "cpp11": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "cpp11",
+        "Version": "0.5.5",
+        "Depends": "R (>= 4.0.0)",
+        "NeedsCompilation": "no",
+        "RemoteType": "standard",
+        "RemotePkgRef": "cpp11",
+        "RemoteRef": "cpp11",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "0.5.5"
+      }
+    },
+    "crayon": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "crayon",
+        "Version": "1.5.3",
+        "Imports": "grDevices, methods, utils",
+        "NeedsCompilation": "no",
+        "RemoteType": "standard",
+        "RemotePkgRef": "crayon",
+        "RemoteRef": "crayon",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "1.5.3"
+      }
+    },
+    "crosstalk": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "crosstalk",
+        "Version": "1.2.2",
+        "Imports": "htmltools (>= 0.3.6), jsonlite, lazyeval, R6",
+        "NeedsCompilation": "no",
+        "RemoteType": "standard",
+        "RemotePkgRef": "crosstalk",
+        "RemoteRef": "crosstalk",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "1.2.2"
+      }
+    },
+    "dbplyr": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "dbplyr",
+        "Version": "2.6.0",
+        "Depends": "R (>= 4.1)",
+        "Imports": "blob (>= 1.2.0), cli (>= 3.6.1), DBI (>= 1.1.3), dplyr (>=\n1.1.2), glue (>= 1.6.2), lifecycle (>= 1.0.3), magrittr,\nmethods, pillar (>= 1.9.0), purrr (>= 1.0.1), R6 (>= 2.2.2),\nrlang (>= 1.1.1), tibble (>= 3.2.1), tidyr (>= 1.3.0),\ntidyselect (>= 1.2.1), utils, vctrs (>= 0.6.3), withr (>=\n2.5.0)",
+        "NeedsCompilation": "no",
+        "RemoteType": "standard",
+        "RemotePkgRef": "dbplyr",
+        "RemoteRef": "dbplyr",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "2.6.0"
+      }
+    },
+    "desc": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "desc",
+        "Version": "1.4.3",
+        "Depends": "R (>= 3.4)",
+        "Imports": "cli, R6, utils",
+        "NeedsCompilation": "no",
+        "RemoteType": "standard",
+        "RemotePkgRef": "desc",
+        "RemoteRef": "desc",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "1.4.3"
+      }
+    },
+    "diffobj": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "diffobj",
+        "Version": "0.3.9",
+        "Depends": "R (>= 4.1.0)",
+        "Imports": "crayon (>= 1.3.2), tools, methods, utils, stats",
+        "NeedsCompilation": "yes",
+        "RemoteType": "standard",
+        "RemotePkgRef": "diffobj",
+        "RemoteRef": "diffobj",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "0.3.9"
+      }
+    },
+    "digest": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "digest",
+        "Version": "0.6.39",
+        "Depends": "R (>= 3.3.0)",
+        "Imports": "utils",
+        "NeedsCompilation": "yes",
+        "RemoteType": "standard",
+        "RemotePkgRef": "digest",
+        "RemoteRef": "digest",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "0.6.39"
+      }
+    },
+    "dplyr": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "dplyr",
+        "Version": "1.2.1",
+        "Depends": "R (>= 4.1.0)",
+        "Imports": "cli (>= 3.6.2), generics, glue (>= 1.3.2), lifecycle (>=\n1.0.5), magrittr (>= 1.5), methods, pillar (>= 1.9.0), R6,\nrlang (>= 1.1.7), tibble (>= 3.2.0), tidyselect (>= 1.2.0),\nutils, vctrs (>= 0.7.1)",
+        "NeedsCompilation": "yes",
+        "RemoteType": "standard",
+        "RemotePkgRef": "dplyr",
+        "RemoteRef": "dplyr",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "1.2.1"
+      }
+    },
+    "evaluate": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "evaluate",
+        "Version": "1.0.5",
+        "Depends": "R (>= 3.6.0)",
+        "NeedsCompilation": "no",
+        "RemoteType": "standard",
+        "RemotePkgRef": "evaluate",
+        "RemoteRef": "evaluate",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "1.0.5"
+      }
+    },
+    "farver": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "farver",
+        "Version": "2.1.2",
+        "NeedsCompilation": "yes",
+        "RemoteType": "standard",
+        "RemotePkgRef": "farver",
+        "RemoteRef": "farver",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "2.1.2"
+      }
+    },
+    "fastmap": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "fastmap",
+        "Version": "1.2.0",
+        "NeedsCompilation": "yes",
+        "RemoteType": "standard",
+        "RemotePkgRef": "fastmap",
+        "RemoteRef": "fastmap",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "1.2.0"
+      }
+    },
+    "fontawesome": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "fontawesome",
+        "Version": "0.5.3",
+        "Depends": "R (>= 3.3.0)",
+        "Imports": "rlang (>= 1.0.6), htmltools (>= 0.5.1.1)",
+        "NeedsCompilation": "no",
+        "RemoteType": "standard",
+        "RemotePkgRef": "fontawesome",
+        "RemoteRef": "fontawesome",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "0.5.3"
+      }
+    },
+    "fs": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "fs",
+        "Version": "2.1.0",
+        "Depends": "R (>= 4.1)",
+        "Imports": "methods",
+        "NeedsCompilation": "yes",
+        "RemoteType": "standard",
+        "RemotePkgRef": "fs",
+        "RemoteRef": "fs",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "2.1.0"
+      }
+    },
+    "generics": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "generics",
+        "Version": "0.1.4",
+        "Depends": "R (>= 3.6)",
+        "Imports": "methods",
+        "NeedsCompilation": "no",
+        "RemoteType": "standard",
+        "RemotePkgRef": "generics",
+        "RemoteRef": "generics",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "0.1.4"
+      }
+    },
+    "ggplot2": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "ggplot2",
+        "Version": "4.0.3",
+        "Depends": "R (>= 4.1)",
+        "Imports": "cli, grDevices, grid, gtable (>= 0.3.6), isoband, lifecycle (>\n1.0.1), rlang (>= 1.1.0), S7, scales (>= 1.4.0), stats, vctrs\n(>= 0.6.0), withr (>= 2.5.0)",
+        "NeedsCompilation": "no",
+        "RemoteType": "standard",
+        "RemotePkgRef": "ggplot2",
+        "RemoteRef": "ggplot2",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "4.0.3"
+      }
+    },
+    "glue": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "glue",
+        "Version": "1.8.1",
+        "Depends": "R (>= 4.1)",
+        "Imports": "methods",
+        "NeedsCompilation": "yes",
+        "RemoteType": "standard",
+        "RemotePkgRef": "glue",
+        "RemoteRef": "glue",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "1.8.1"
+      }
+    },
+    "gtable": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "gtable",
+        "Version": "0.3.6",
+        "Depends": "R (>= 4.0)",
+        "Imports": "cli, glue, grid, lifecycle, rlang (>= 1.1.0), stats",
+        "NeedsCompilation": "no",
+        "RemoteType": "standard",
+        "RemotePkgRef": "gtable",
+        "RemoteRef": "gtable",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "0.3.6"
+      }
+    },
+    "highr": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "highr",
+        "Version": "0.12",
+        "Depends": "R (>= 3.3.0)",
+        "Imports": "xfun (>= 0.18)",
+        "NeedsCompilation": "no",
+        "RemoteType": "standard",
+        "RemotePkgRef": "highr",
+        "RemoteRef": "highr",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "0.12"
+      }
+    },
+    "hms": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "hms",
+        "Version": "1.1.4",
+        "Imports": "cli, lifecycle, methods, pkgconfig, rlang (>= 1.0.2), vctrs\n(>= 0.3.8)",
+        "NeedsCompilation": "no",
+        "RemoteType": "standard",
+        "RemotePkgRef": "hms",
+        "RemoteRef": "hms",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "1.1.4"
+      }
+    },
+    "htmltools": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "htmltools",
+        "Version": "0.5.9",
+        "Depends": "R (>= 2.14.1)",
+        "Imports": "base64enc, digest, fastmap (>= 1.1.0), grDevices, rlang (>=\n1.0.0), utils",
+        "NeedsCompilation": "yes",
+        "RemoteType": "standard",
+        "RemotePkgRef": "htmltools",
+        "RemoteRef": "htmltools",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "0.5.9"
+      }
+    },
+    "htmlwidgets": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "htmlwidgets",
+        "Version": "1.6.4",
+        "Imports": "grDevices, htmltools (>= 0.5.7), jsonlite (>= 0.9.16), knitr\n(>= 1.8), rmarkdown, yaml",
+        "NeedsCompilation": "no",
+        "RemoteType": "standard",
+        "RemotePkgRef": "htmlwidgets",
+        "RemoteRef": "htmlwidgets",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "1.6.4"
+      }
+    },
+    "httpuv": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "httpuv",
+        "Version": "1.6.17",
+        "Depends": "R (>= 2.15.1)",
+        "Imports": "later (>= 0.8.0), promises, R6, Rcpp (>= 1.0.7), utils",
+        "LinkingTo": "later, Rcpp",
+        "NeedsCompilation": "yes",
+        "RemoteType": "standard",
+        "RemotePkgRef": "httpuv",
+        "RemoteRef": "httpuv",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "1.6.17"
+      }
+    },
+    "isoband": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "isoband",
+        "Version": "0.3.0",
+        "Imports": "cli, grid, rlang, utils",
+        "LinkingTo": "cpp11",
+        "NeedsCompilation": "yes",
+        "RemoteType": "standard",
+        "RemotePkgRef": "isoband",
+        "RemoteRef": "isoband",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "0.3.0"
+      }
+    },
+    "jquerylib": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "jquerylib",
+        "Version": "0.1.4",
+        "Imports": "htmltools",
+        "NeedsCompilation": "no",
+        "RemoteType": "standard",
+        "RemotePkgRef": "jquerylib",
+        "RemoteRef": "jquerylib",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "0.1.4"
+      }
+    },
+    "jsonlite": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "jsonlite",
+        "Version": "2.0.0",
+        "Depends": "methods",
+        "NeedsCompilation": "yes",
+        "RemoteType": "standard",
+        "RemotePkgRef": "jsonlite",
+        "RemoteRef": "jsonlite",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "2.0.0"
+      }
+    },
+    "knitr": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "knitr",
+        "Version": "1.52",
+        "Depends": "R (>= 3.6.0)",
+        "Imports": "evaluate (>= 0.15), highr (>= 0.11), methods, tools, xfun (>=\n0.52), yaml (>= 2.1.19)",
+        "NeedsCompilation": "no",
+        "RemoteType": "standard",
+        "RemotePkgRef": "knitr",
+        "RemoteRef": "knitr",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "1.52"
+      }
+    },
+    "labeling": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "labeling",
+        "Version": "0.4.3",
+        "Imports": "stats, graphics",
+        "NeedsCompilation": "no",
+        "RemoteType": "standard",
+        "RemotePkgRef": "labeling",
+        "RemoteRef": "labeling",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "0.4.3"
+      }
+    },
+    "later": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "later",
+        "Version": "1.4.8",
+        "Depends": "R (>= 3.5)",
+        "Imports": "Rcpp (>= 1.0.10), rlang",
+        "LinkingTo": "Rcpp",
+        "NeedsCompilation": "yes",
+        "RemoteType": "standard",
+        "RemotePkgRef": "later",
+        "RemoteRef": "later",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "1.4.8"
+      }
+    },
+    "lazyeval": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "lazyeval",
+        "Version": "0.2.3",
+        "Depends": "R (>= 3.1.0)",
+        "Imports": "rlang",
+        "NeedsCompilation": "yes",
+        "RemoteType": "standard",
+        "RemotePkgRef": "lazyeval",
+        "RemoteRef": "lazyeval",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "0.2.3"
+      }
+    },
+    "lifecycle": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "lifecycle",
+        "Version": "1.0.5",
+        "Depends": "R (>= 3.6)",
+        "Imports": "cli (>= 3.4.0), rlang (>= 1.1.0)",
+        "NeedsCompilation": "no",
+        "RemoteType": "standard",
+        "RemotePkgRef": "lifecycle",
+        "RemoteRef": "lifecycle",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "1.0.5"
+      }
+    },
+    "lubridate": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "lubridate",
+        "Version": "1.9.5",
+        "Depends": "methods, R (>= 3.2)",
+        "Imports": "generics, timechange (>= 0.4.0)",
+        "NeedsCompilation": "yes",
+        "RemoteType": "standard",
+        "RemotePkgRef": "lubridate",
+        "RemoteRef": "lubridate",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "1.9.5"
+      }
+    },
+    "magrittr": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "magrittr",
+        "Version": "2.0.5",
+        "Depends": "R (>= 3.4.0)",
+        "NeedsCompilation": "yes",
+        "RemoteType": "standard",
+        "RemotePkgRef": "magrittr",
+        "RemoteRef": "magrittr",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "2.0.5"
+      }
+    },
+    "memoise": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "memoise",
+        "Version": "2.0.1",
+        "Imports": "rlang (>= 0.4.10), cachem",
+        "NeedsCompilation": "no",
+        "RemoteType": "standard",
+        "RemotePkgRef": "memoise",
+        "RemoteRef": "memoise",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "2.0.1"
+      }
+    },
+    "mime": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "mime",
+        "Version": "0.13",
+        "Imports": "tools",
+        "NeedsCompilation": "yes",
+        "RemoteType": "standard",
+        "RemotePkgRef": "mime",
+        "RemoteRef": "mime",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "0.13"
+      }
+    },
+    "openssl": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "openssl",
+        "Version": "2.4.2",
+        "Imports": "askpass",
+        "NeedsCompilation": "yes",
+        "RemoteType": "standard",
+        "RemotePkgRef": "openssl",
+        "RemoteRef": "openssl",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "2.4.2"
+      }
+    },
+    "otel": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "otel",
+        "Version": "0.2.0",
+        "Depends": "R (>= 3.6.0)",
+        "NeedsCompilation": "no",
+        "RemoteType": "standard",
+        "RemotePkgRef": "otel",
+        "RemoteRef": "otel",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "0.2.0"
+      }
+    },
+    "pillar": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "pillar",
+        "Version": "1.11.1",
+        "Imports": "cli (>= 2.3.0), glue, lifecycle, rlang (>= 1.0.2), utf8 (>=\n1.1.0), utils, vctrs (>= 0.5.0)",
+        "NeedsCompilation": "no",
+        "RemoteType": "standard",
+        "RemotePkgRef": "pillar",
+        "RemoteRef": "pillar",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "1.11.1"
+      }
+    },
+    "pkgbuild": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "pkgbuild",
+        "Version": "1.4.8",
+        "Depends": "R (>= 3.5)",
+        "Imports": "callr (>= 3.2.0), cli (>= 3.4.0), desc, processx, R6",
+        "NeedsCompilation": "no",
+        "RemoteType": "standard",
+        "RemotePkgRef": "pkgbuild",
+        "RemoteRef": "pkgbuild",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "1.4.8"
+      }
+    },
+    "pkgconfig": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "pkgconfig",
+        "Version": "2.0.3",
+        "Imports": "utils",
+        "NeedsCompilation": "no",
+        "RemoteType": "standard",
+        "RemotePkgRef": "pkgconfig",
+        "RemoteRef": "pkgconfig",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "2.0.3"
+      }
+    },
+    "pkgload": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "pkgload",
+        "Version": "1.5.3",
+        "Depends": "R (>= 3.4.0)",
+        "Imports": "cli (>= 3.3.0), desc, fs, glue, lifecycle, methods, pkgbuild,\nprocessx, rlang (>= 1.1.1), rprojroot, utils",
+        "NeedsCompilation": "no",
+        "RemoteType": "standard",
+        "RemotePkgRef": "pkgload",
+        "RemoteRef": "pkgload",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "1.5.3"
+      }
+    },
+    "praise": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "praise",
+        "Version": "1.0.0",
+        "NeedsCompilation": "no",
+        "RemoteType": "standard",
+        "RemotePkgRef": "praise",
+        "RemoteRef": "praise",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "1.0.0"
+      }
+    },
+    "processx": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "processx",
+        "Version": "3.9.0",
+        "Depends": "R (>= 3.4.0)",
+        "Imports": "ps (>= 1.9.3), R6, utils",
+        "NeedsCompilation": "yes",
+        "RemoteType": "standard",
+        "RemotePkgRef": "processx",
+        "RemoteRef": "processx",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "3.9.0"
+      }
+    },
+    "promises": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "promises",
+        "Version": "1.5.0",
+        "Depends": "R (>= 4.1.0)",
+        "Imports": "fastmap (>= 1.1.0), later, lifecycle, magrittr (>= 1.5), otel\n(>= 0.2.0), R6, rlang",
+        "NeedsCompilation": "no",
+        "RemoteType": "standard",
+        "RemotePkgRef": "promises",
+        "RemoteRef": "promises",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "1.5.0"
+      }
+    },
+    "ps": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "ps",
+        "Version": "1.9.3",
+        "Depends": "R (>= 3.4)",
+        "Imports": "utils",
+        "NeedsCompilation": "yes",
+        "RemoteType": "standard",
+        "RemotePkgRef": "ps",
+        "RemoteRef": "ps",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "1.9.3"
+      }
+    },
+    "purrr": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "purrr",
+        "Version": "1.2.2",
+        "Depends": "R (>= 4.1)",
+        "Imports": "cli (>= 3.6.1), lifecycle (>= 1.0.3), magrittr (>= 1.5.0),\nrlang (>= 1.1.1), vctrs (>= 0.6.3)",
+        "LinkingTo": "cli",
+        "NeedsCompilation": "yes",
+        "RemoteType": "standard",
+        "RemotePkgRef": "purrr",
+        "RemoteRef": "purrr",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "1.2.2"
+      }
+    },
+    "rappdirs": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "rappdirs",
+        "Version": "0.3.4",
+        "Depends": "R (>= 4.1)",
+        "NeedsCompilation": "yes",
+        "RemoteType": "standard",
+        "RemotePkgRef": "rappdirs",
+        "RemoteRef": "rappdirs",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "0.3.4"
+      }
+    },
+    "rlang": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "rlang",
+        "Version": "1.3.0",
+        "Depends": "R (>= 4.0.0)",
+        "Imports": "utils",
+        "NeedsCompilation": "yes",
+        "RemoteType": "standard",
+        "RemotePkgRef": "rlang",
+        "RemoteRef": "rlang",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "1.3.0"
+      }
+    },
+    "rmarkdown": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "rmarkdown",
+        "Version": "2.32",
+        "Depends": "R (>= 3.0)",
+        "Imports": "bslib (>= 0.2.5.1), evaluate (>= 0.13), fontawesome (>=\n0.5.0), htmltools (>= 0.5.1), jquerylib, jsonlite, knitr (>=\n1.50), methods, tinytex (>= 0.31), tools, utils, xfun (>=\n0.36), yaml (>= 2.1.19)",
+        "NeedsCompilation": "no",
+        "RemoteType": "standard",
+        "RemotePkgRef": "rmarkdown",
+        "RemoteRef": "rmarkdown",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "2.32"
+      }
+    },
+    "rprojroot": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "rprojroot",
+        "Version": "2.1.1",
+        "Depends": "R (>= 3.0.0)",
+        "NeedsCompilation": "no",
+        "RemoteType": "standard",
+        "RemotePkgRef": "rprojroot",
+        "RemoteRef": "rprojroot",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "2.1.1"
+      }
+    },
+    "sass": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "sass",
+        "Version": "0.4.10",
+        "Imports": "fs (>= 1.2.4), rlang (>= 0.4.10), htmltools (>= 0.5.1), R6,\nrappdirs",
+        "NeedsCompilation": "yes",
+        "RemoteType": "standard",
+        "RemotePkgRef": "sass",
+        "RemoteRef": "sass",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "0.4.10"
+      }
+    },
+    "scales": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "scales",
+        "Version": "1.4.0",
+        "Depends": "R (>= 4.1)",
+        "Imports": "cli, farver (>= 2.0.3), glue, labeling, lifecycle, R6,\nRColorBrewer, rlang (>= 1.1.0), viridisLite",
+        "NeedsCompilation": "no",
+        "RemoteType": "standard",
+        "RemotePkgRef": "scales",
+        "RemoteRef": "scales",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "1.4.0"
+      }
+    },
+    "scrypt": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "scrypt",
+        "Version": "0.1.6",
+        "Depends": "R (>= 3.0.0)",
+        "Imports": "Rcpp (>= 0.10.6)",
+        "LinkingTo": "Rcpp",
+        "NeedsCompilation": "yes",
+        "RemoteType": "standard",
+        "RemotePkgRef": "scrypt",
+        "RemoteRef": "scrypt",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "0.1.6"
+      }
+    },
+    "shiny": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "shiny",
+        "Version": "1.14.0",
+        "Depends": "methods, R (>= 3.1.2)",
+        "Imports": "bslib (>= 0.6.0), cachem (>= 1.1.0), cli, commonmark (>=\n2.0.0), fastmap (>= 1.1.1), fontawesome (>= 0.4.0), glue (>=\n1.3.2), grDevices, htmltools (>= 0.5.4), httpuv (>= 1.5.2),\njsonlite (>= 0.9.16), later (>= 1.0.0), lifecycle (>= 0.2.0),\nmime (>= 0.3), otel, promises (>= 1.5.0), R6 (>= 2.0), rlang\n(>= 0.4.10), sourcetools, tools, utils, withr, xtable",
+        "NeedsCompilation": "no",
+        "RemoteType": "standard",
+        "RemotePkgRef": "shiny",
+        "RemoteRef": "shiny",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "1.14.0"
+      }
+    },
+    "shinymanager": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "shinymanager",
+        "Version": "1.2.0",
+        "Imports": "R6, shiny, htmltools, DT (>= 0.5), DBI, RSQLite, openssl,\nR.utils, billboarder, scrypt, yaml, glue, later",
+        "NeedsCompilation": "no",
+        "RemoteType": "standard",
+        "RemotePkgRef": "shinymanager",
+        "RemoteRef": "shinymanager",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "1.2.0"
+      }
+    },
+    "sourcetools": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "sourcetools",
+        "Version": "0.1.7-2",
+        "Depends": "R (>= 3.0.2)",
+        "NeedsCompilation": "yes",
+        "RemoteType": "standard",
+        "RemotePkgRef": "sourcetools",
+        "RemoteRef": "sourcetools",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "0.1.7-2"
+      }
+    },
+    "stringi": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "stringi",
+        "Version": "1.8.9",
+        "Depends": "R (>= 3.4)",
+        "Imports": "tools, utils, stats",
+        "NeedsCompilation": "yes",
+        "RemoteType": "standard",
+        "RemotePkgRef": "stringi",
+        "RemoteRef": "stringi",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "1.8.9"
+      }
+    },
+    "stringr": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "stringr",
+        "Version": "1.6.0",
+        "Depends": "R (>= 4.1.0)",
+        "Imports": "cli, glue (>= 1.6.1), lifecycle (>= 1.0.3), magrittr, rlang\n(>= 1.0.0), stringi (>= 1.5.3), vctrs (>= 0.4.0)",
+        "NeedsCompilation": "no",
+        "RemoteType": "standard",
+        "RemotePkgRef": "stringr",
+        "RemoteRef": "stringr",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "1.6.0"
+      }
+    },
+    "sys": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "sys",
+        "Version": "3.4.3",
+        "NeedsCompilation": "yes",
+        "RemoteType": "standard",
+        "RemotePkgRef": "sys",
+        "RemoteRef": "sys",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "3.4.3"
+      }
+    },
+    "testthat": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "testthat",
+        "Version": "3.3.2",
+        "Depends": "R (>= 4.1.0)",
+        "Imports": "brio (>= 1.1.5), callr (>= 3.7.6), cli (>= 3.6.5), desc (>=\n1.4.3), evaluate (>= 1.0.4), jsonlite (>= 2.0.0), lifecycle (>=\n1.0.4), magrittr (>= 2.0.3), methods, pkgload (>= 1.4.0),\npraise (>= 1.0.0), processx (>= 3.8.6), ps (>= 1.9.1), R6 (>=\n2.6.1), rlang (>= 1.1.6), utils, waldo (>= 0.6.2), withr (>=\n3.0.2)",
+        "NeedsCompilation": "yes",
+        "RemoteType": "standard",
+        "RemotePkgRef": "testthat",
+        "RemoteRef": "testthat",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "3.3.2"
+      }
+    },
+    "tibble": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "tibble",
+        "Version": "3.3.1",
+        "Depends": "R (>= 3.4.0)",
+        "Imports": "cli, lifecycle (>= 1.0.0), magrittr, methods, pillar (>=\n1.8.1), pkgconfig, rlang (>= 1.0.2), utils, vctrs (>= 0.5.0)",
+        "NeedsCompilation": "yes",
+        "RemoteType": "standard",
+        "RemotePkgRef": "tibble",
+        "RemoteRef": "tibble",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "3.3.1"
+      }
+    },
+    "tidyr": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "tidyr",
+        "Version": "1.3.2",
+        "Depends": "R (>= 4.1.0)",
+        "Imports": "cli (>= 3.4.1), dplyr (>= 1.1.0), glue, lifecycle (>= 1.0.3),\nmagrittr, purrr (>= 1.0.1), rlang (>= 1.1.1), stringr (>=\n1.5.0), tibble (>= 2.1.1), tidyselect (>= 1.2.1), utils, vctrs\n(>= 0.5.2)",
+        "LinkingTo": "cpp11 (>= 0.4.0)",
+        "NeedsCompilation": "yes",
+        "RemoteType": "standard",
+        "RemotePkgRef": "tidyr",
+        "RemoteRef": "tidyr",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "1.3.2"
+      }
+    },
+    "tidyselect": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "tidyselect",
+        "Version": "1.2.1",
+        "Depends": "R (>= 3.4)",
+        "Imports": "cli (>= 3.3.0), glue (>= 1.3.0), lifecycle (>= 1.0.3), rlang\n(>= 1.0.4), vctrs (>= 0.5.2), withr",
+        "NeedsCompilation": "yes",
+        "RemoteType": "standard",
+        "RemotePkgRef": "tidyselect",
+        "RemoteRef": "tidyselect",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "1.2.1"
+      }
+    },
+    "timechange": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "timechange",
+        "Version": "0.4.0",
+        "Depends": "R (>= 3.3)",
+        "LinkingTo": "cpp11 (>= 0.2.7)",
+        "NeedsCompilation": "yes",
+        "RemoteType": "standard",
+        "RemotePkgRef": "timechange",
+        "RemoteRef": "timechange",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "0.4.0"
+      }
+    },
+    "tinytex": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "tinytex",
+        "Version": "0.61",
+        "Imports": "xfun (>= 0.48)",
+        "NeedsCompilation": "no",
+        "RemoteType": "standard",
+        "RemotePkgRef": "tinytex",
+        "RemoteRef": "tinytex",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "0.61"
+      }
+    },
+    "utf8": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "utf8",
+        "Version": "1.2.6",
+        "Depends": "R (>= 2.10)",
+        "NeedsCompilation": "yes",
+        "RemoteType": "standard",
+        "RemotePkgRef": "utf8",
+        "RemoteRef": "utf8",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "1.2.6"
+      }
+    },
+    "vctrs": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "vctrs",
+        "Version": "0.7.3",
+        "Depends": "R (>= 4.0.0)",
+        "Imports": "cli (>= 3.4.0), glue, lifecycle (>= 1.0.3), rlang (>= 1.1.7)",
+        "NeedsCompilation": "yes",
+        "RemoteType": "standard",
+        "RemotePkgRef": "vctrs",
+        "RemoteRef": "vctrs",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "0.7.3"
+      }
+    },
+    "viridisLite": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "viridisLite",
+        "Version": "0.4.3",
+        "Depends": "R (>= 2.10)",
+        "NeedsCompilation": "no",
+        "RemoteType": "standard",
+        "RemotePkgRef": "viridisLite",
+        "RemoteRef": "viridisLite",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "0.4.3"
+      }
+    },
+    "waldo": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "waldo",
+        "Version": "0.6.2",
+        "Depends": "R (>= 4.0)",
+        "Imports": "cli, diffobj (>= 0.3.4), glue, methods, rlang (>= 1.1.0)",
+        "NeedsCompilation": "no",
+        "RemoteType": "standard",
+        "RemotePkgRef": "waldo",
+        "RemoteRef": "waldo",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "0.6.2"
+      }
+    },
+    "withr": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "withr",
+        "Version": "3.0.3",
+        "Depends": "R (>= 3.6.0)",
+        "Imports": "graphics, grDevices",
+        "NeedsCompilation": "no",
+        "RemoteType": "standard",
+        "RemotePkgRef": "withr",
+        "RemoteRef": "withr",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "3.0.3"
+      }
+    },
+    "writexl": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "writexl",
+        "Version": "2.0.1",
+        "NeedsCompilation": "yes",
+        "RemoteType": "standard",
+        "RemotePkgRef": "writexl",
+        "RemoteRef": "writexl",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "2.0.1"
+      }
+    },
+    "xfun": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "xfun",
+        "Version": "0.61",
+        "Depends": "R (>= 3.2.0)",
+        "Imports": "grDevices, stats, tools",
+        "NeedsCompilation": "yes",
+        "RemoteType": "standard",
+        "RemotePkgRef": "xfun",
+        "RemoteRef": "xfun",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "0.61"
+      }
+    },
+    "xtable": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "xtable",
+        "Version": "1.8-8",
+        "Depends": "R (>= 2.10.0)",
+        "Imports": "stats, utils, methods",
+        "NeedsCompilation": "no",
+        "RemoteType": "standard",
+        "RemotePkgRef": "xtable",
+        "RemoteRef": "xtable",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "1.8-8"
+      }
+    },
+    "yaml": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "yaml",
+        "Version": "2.3.12",
+        "NeedsCompilation": "yes",
+        "RemoteType": "standard",
+        "RemotePkgRef": "yaml",
+        "RemoteRef": "yaml",
+        "RemoteRepos": "https://cran.rstudio.com",
+        "RemoteSha.Version": "2.3.12"
+      }
+    }
+  }
+}
