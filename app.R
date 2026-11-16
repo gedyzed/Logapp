@@ -190,6 +190,13 @@ login_style <- "
     padding-right: 3.25rem !important;
   }
 
+  .login-password-wrap input::-ms-reveal,
+  .login-password-wrap input::-ms-clear {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+
   .login-password-toggle {
     position: absolute !important;
     right: 0.7rem !important;

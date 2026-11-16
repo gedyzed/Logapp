@@ -34,23 +34,12 @@
   # by other connections (including other Shiny sessions and external writers).
   poll_cn <- con()
   session$onSessionEnded(function() {
-    if (DBI::dbIsValid(poll_cn)) DBI::dbDisconnect(poll_cn)
+    db_release(poll_cn)
   })
-  load_expense_rows <- function(cn) {
-    rows <- dbGetQuery(cn,
-                       "SELECT e.*, p.project_code, bl.budget_line_code AS budget_line
-         FROM expenses e
-         LEFT JOIN budget_lines bl ON bl.id = e.budget_line_id
-         LEFT JOIN projects p ON p.id = bl.project_id
-         ORDER BY e.id DESC")
-    # Include the database revision so catalogue/default changes invalidate dependants
-    # even when the expense rows themselves are unchanged.
-    attr(rows, "database_revision") <- as.character(dbGetQuery(cn, "PRAGMA data_version")[[1]][[1]])
-    rows
-  }
+  load_expense_rows <- function(cn) load_request_rows(cn)
   db_poll <- reactivePoll(
     1000, session,
-    checkFunc = function() as.character(dbGetQuery(poll_cn, "PRAGMA data_version")[[1]][[1]]),
+    checkFunc = function() as.character(dbGetQuery(poll_cn, "SELECT data_revision FROM settings WHERE id = 1")[[1]][[1]]),
     valueFunc = function() load_expense_rows(poll_cn)
   )
   # Same-session writes do not change data_version on poll_cn. Mark Paid stores a
@@ -61,7 +50,7 @@
   }, ignoreInit = FALSE)
   reload_expenses <- function() {
     cn <- con()
-    on.exit(if (DBI::dbIsValid(cn)) DBI::dbDisconnect(cn), add = TRUE)
+    on.exit(db_release(cn), add = TRUE)
     expense_rows(load_expense_rows(cn))
   }
   dashboard_last_refresh <- reactiveVal(Sys.time())
@@ -81,10 +70,17 @@
     usd <- as.numeric(ifelse(is.na(d$usd),
                              as.numeric(d$amount) / unname(RATES[d$currency]),
                              d$usd))
+    d$usd <- usd
     for (k in CUR)
       d[[k]] <- as.numeric(ifelse(d$currency %in% k, d$amount,
                                   round(usd * RATES[[k]], 2)))
     d$scenario      <- scenario(usd, d$waiver)
+    # safe_date() turns a length-0 column into one NA. format() of that cannot
+    # be assigned onto an empty table, and that error was ending the session.
+    if (!nrow(d)) {
+      d$week <- d$month <- d$year <- d$quarter <- character(0)
+      return(d)
+    }
     date_value <- safe_date(d$order_date)
     d$week          <- format(date_value, "%G-W%V")
     d$month         <- format(date_value, "%Y-%m")
@@ -157,7 +153,7 @@
     prev_mo <- last_month()
     current_month <- format(app_today(), "%Y-%m")
     available_months <- unique(c(d$month, prev_mo, current_month))
-    month_selected <- isolate(input$f_month) %||% prev_mo
+    month_selected <- isolate(input$f_month) %||% current_month
     if (identical(month_selected, "__none__")) month_selected <- ""
     month_opts <- month_choices(available_months)
     push_input("f_month",
@@ -185,7 +181,7 @@
     selected_dash_dept <- if (is.null(input$dash_department)) character() else as.character(input$dash_department)
     if (length(selected_dash_dept)) {
       db_projs <- tryCatch(
-        db_get("SELECT project_code, department FROM projects"),
+        db_get("SELECT code AS project_code, department_code AS department FROM project_budgets"),
         error = function(e) data.frame(project_code = character(), department = character())
       )
       matched_db <- db_projs$project_code[db_projs$department %in% selected_dash_dept]
@@ -331,7 +327,7 @@
     if (nzchar(v(f$month)) && !identical(v(f$month), "__none__")) d <- filter(d, month == f$month)
     if (length(picked(f$week))) d <- filter(d, week %in% picked(f$week))
     if (length(picked(f$project))) d <- filter(d, project_code %in% picked(f$project))
-    if (length(picked(f$budget))) d <- filter(d, budget_line_id %in% as.integer(picked(f$budget)))
+    if (length(picked(f$budget))) d <- filter(d, budget_line_id %in% as.character(picked(f$budget)))
     if (length(picked(f$person))) d <- filter(d, requested_by %in% picked(f$person))
     if (length(picked(f$submitter))) d <- filter(d, submitted_by %in% picked(f$submitter))
     query <- trimws(v(f$query))

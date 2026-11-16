@@ -41,8 +41,8 @@ test_that("[21] Manage add/edit validation: empty and duplicates show type='erro
     session$setInputs(cfg_add_project = 2)
     session$flushReact()
 
-    box$empty_proj_count <- DBI::dbGetQuery(cn, "SELECT COUNT(*) AS n FROM projects WHERE trim(project_code) = ''")$n[[1]]
-    box$post_alpha_proj <- DBI::dbGetQuery(cn, "SELECT COUNT(*) AS n FROM projects WHERE project_code = 'ALPHA' COLLATE NOCASE")$n[[1]]
+    box$empty_proj_count <- DBI::dbGetQuery(cn, "SELECT COUNT(*) AS n FROM project_budgets WHERE trim(code) = ''")$n[[1]]
+    box$post_alpha_proj <- DBI::dbGetQuery(cn, "SELECT COUNT(*) AS n FROM project_budgets WHERE lower(code) = 'alpha'")$n[[1]]
 
     # Budget Line Add: Empty & Duplicate
     session$setInputs(cfg_budget_project = "ALPHA", cfg_budget_line = "   ")
@@ -53,8 +53,8 @@ test_that("[21] Manage add/edit validation: empty and duplicates show type='erro
     session$setInputs(cfg_add_budget_line = 2)
     session$flushReact()
 
-    box$empty_bl_count <- DBI::dbGetQuery(cn, "SELECT COUNT(*) AS n FROM budget_lines WHERE trim(budget_line_code) = ''")$n[[1]]
-    box$post_alpha_lines <- DBI::dbGetQuery(cn, "SELECT COUNT(*) AS n FROM budget_lines bl JOIN projects p ON p.id = bl.project_id WHERE p.project_code = 'ALPHA'")$n[[1]]
+    box$empty_bl_count <- DBI::dbGetQuery(cn, "SELECT COUNT(*) AS n FROM budget_lines WHERE trim(code) = ''")$n[[1]]
+    box$post_alpha_lines <- DBI::dbGetQuery(cn, "SELECT COUNT(*) AS n FROM budget_lines bl JOIN project_budgets p ON p.id = bl.project_budget_id WHERE p.code = 'ALPHA'")$n[[1]]
 
     # Supplier Add: Empty & Duplicate
     session$setInputs(cfg_supplier_name = "   ")
@@ -105,8 +105,8 @@ test_that("[21] Manage add/edit validation: empty and duplicates show type='erro
     session$setInputs(cfg_add_supplier = 3)
     session$flushReact()
 
-    box$saved_project <- DBI::dbGetQuery(cn, "SELECT * FROM projects WHERE project_code = 'TESTPROJ'")
-    box$saved_bl <- DBI::dbGetQuery(cn, "SELECT bl.* FROM budget_lines bl JOIN projects p ON p.id = bl.project_id WHERE p.project_code = 'TESTPROJ'")
+    box$saved_project <- DBI::dbGetQuery(cn, "SELECT code AS project_code, department_code AS department FROM project_budgets WHERE code = 'TESTPROJ'")
+    box$saved_bl <- DBI::dbGetQuery(cn, "SELECT bl.code AS budget_line_code FROM budget_lines bl JOIN project_budgets p ON p.id = bl.project_budget_id WHERE p.code = 'TESTPROJ'")
     box$saved_supplier <- DBI::dbGetQuery(cn, "SELECT * FROM suppliers WHERE supplier_name = 'Global Cargo'")
 
     box$proj_codes <- project_codes_db()

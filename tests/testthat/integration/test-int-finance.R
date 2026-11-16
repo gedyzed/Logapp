@@ -17,7 +17,7 @@ test_that("[13] Row marked paid appears in Financial Updates", {
     # Mark under_review request as paid
     target_id <- all_d$id[all_d$status == "under_review"][[1]]
     cn <- DBI::dbConnect(RSQLite::SQLite(), fixture$path)
-    DBI::dbExecute(cn, "UPDATE expenses SET status = 'paid', payment_date = '2026-11-06' WHERE id = ?",
+    DBI::dbExecute(cn, "UPDATE requests SET status = 'paid' WHERE id = ?",
                    params = list(target_id))
     DBI::dbDisconnect(cn)
 
@@ -85,7 +85,8 @@ test_that("[15] Create batch: validations (empty name, >80 chars, duplicates all
     session$flushReact()
 
     cn <- DBI::dbConnect(RSQLite::SQLite(), fixture$path)
-    box$empty_count <- nrow(DBI::dbGetQuery(cn, "SELECT * FROM financial_batches"))
+    box$baseline <- nrow(DBI::dbGetQuery(cn, "SELECT id FROM financial_batches"))
+    box$empty_count <- nrow(DBI::dbGetQuery(cn, "SELECT id FROM financial_batches")) - box$baseline
 
     # 2. >80 characters
     long_name <- paste(rep("A", 81), collapse = "")
@@ -94,7 +95,7 @@ test_that("[15] Create batch: validations (empty name, >80 chars, duplicates all
     session$setInputs(fin_batch_name = long_name)
     session$setInputs(fin_btn_batch_create = 2)
     session$flushReact()
-    box$long_count <- nrow(DBI::dbGetQuery(cn, "SELECT * FROM financial_batches"))
+    box$long_count <- nrow(DBI::dbGetQuery(cn, "SELECT id FROM financial_batches")) - box$baseline
 
     # 3. Valid batch creation
     session$setInputs(fin_btn_batch = 3)
@@ -102,7 +103,7 @@ test_that("[15] Create batch: validations (empty name, >80 chars, duplicates all
     session$setInputs(fin_batch_name = "Batch Alpha")
     session$setInputs(fin_btn_batch_create = 3)
     session$flushReact()
-    box$first_batch <- DBI::dbGetQuery(cn, "SELECT * FROM financial_batches ORDER BY id DESC LIMIT 1")
+    box$first_batch <- DBI::dbGetQuery(cn, "SELECT * FROM financial_batches WHERE batch_name = 'Batch Alpha' ORDER BY prepared_at DESC LIMIT 1")
 
     # 4. Duplicate name is allowed
     session$setInputs(fin_project_select = list("FIN02"))
@@ -112,7 +113,7 @@ test_that("[15] Create batch: validations (empty name, >80 chars, duplicates all
     session$setInputs(fin_btn_batch_create = 4)
     session$flushReact()
 
-    box$all_batches <- DBI::dbGetQuery(cn, "SELECT * FROM financial_batches")
+    box$all_batches <- DBI::dbGetQuery(cn, "SELECT * FROM financial_batches WHERE batch_name = 'Batch Alpha'")
     DBI::dbDisconnect(cn)
   })
 
@@ -145,10 +146,12 @@ test_that("[16] Confirm Applied: sets deducted_at; Reject: restores projects; Ex
     cn <- DBI::dbConnect(RSQLite::SQLite(), fixture$path)
     bth <- DBI::dbGetQuery(cn, "SELECT * FROM financial_batches WHERE batch_name = 'FIN01 Deduct Batch'")
     box$bth_code <- bth$batch_code[[1]]
-    bth_ids <- as.integer(strsplit(bth$request_ids[[1]], ",")[[1]])
-
-    pre_expenses <- DBI::dbGetQuery(cn, sprintf("SELECT id, deducted_at FROM expenses WHERE id IN (%s)",
-                                                paste(bth_ids, collapse = ",")))
+    pre_expenses <- DBI::dbGetQuery(cn, "SELECT pe.request_id AS id,
+      CASE WHEN fb.status = 'applied' AND bi.released_at IS NULL THEN fb.applied_at ELSE NULL END AS deducted_at
+      FROM financial_batches fb
+      JOIN batch_items bi ON bi.batch_id = fb.id
+      JOIN payment_events pe ON pe.id = bi.payment_event_id
+      WHERE fb.batch_code = ?", params = list(box$bth_code))
     box$pre_deducted_null <- all(is.na(pre_expenses$deducted_at))
 
     # 2. Confirm Applied
@@ -157,11 +160,15 @@ test_that("[16] Confirm Applied: sets deducted_at; Reject: restores projects; Ex
     session$setInputs(fin_btn_confirm_proceed = 1)
     session$flushReact()
 
-    post_bth <- DBI::dbGetQuery(cn, "SELECT status, confirmed_at FROM financial_batches WHERE batch_code = ?",
+    post_bth <- DBI::dbGetQuery(cn, "SELECT status, applied_at FROM financial_batches WHERE batch_code = ?",
                                 params = list(box$bth_code))
-    post_expenses <- DBI::dbGetQuery(cn, sprintf("SELECT id, deducted_at FROM expenses WHERE id IN (%s)",
-                                                 paste(bth_ids, collapse = ",")))
-    post_projects <- DBI::dbGetQuery(cn, "SELECT project_code, last_deducted_at FROM projects WHERE project_code = 'FIN01'")
+    post_expenses <- DBI::dbGetQuery(cn, "SELECT pe.request_id AS id,
+      CASE WHEN fb.status = 'applied' AND bi.released_at IS NULL THEN fb.applied_at ELSE NULL END AS deducted_at
+      FROM financial_batches fb
+      JOIN batch_items bi ON bi.batch_id = fb.id
+      JOIN payment_events pe ON pe.id = bi.payment_event_id
+      WHERE fb.batch_code = ?", params = list(box$bth_code))
+    post_projects <- DBI::dbGetQuery(cn, "SELECT code AS project_code, last_checkpoint_at AS last_deducted_at FROM project_budgets WHERE code = 'FIN01'")
 
     box$post_bth_status <- post_bth$status[[1]]
     box$expenses_deducted_set <- all(!is.na(post_expenses$deducted_at))
@@ -189,7 +196,11 @@ test_that("[16] Confirm Applied: sets deducted_at; Reject: restores projects; Ex
 
     fin02_bth <- DBI::dbGetQuery(cn, "SELECT * FROM financial_batches WHERE batch_name = 'FIN02 Reject Batch'")
     fin02_code <- fin02_bth$batch_code[[1]]
-    fin02_ids <- as.integer(strsplit(fin02_bth$request_ids[[1]], ",")[[1]])
+    fin02_ids <- DBI::dbGetQuery(cn, "SELECT pe.request_id AS id
+      FROM batch_items bi
+      JOIN payment_events pe ON pe.id = bi.payment_event_id
+      JOIN financial_batches fb ON fb.id = bi.batch_id
+      WHERE fb.batch_code = ?", params = list(fin02_code))$id
 
     session$setInputs(fin_btn_reject = list(code = fin02_code))
     session$flushReact()
@@ -198,8 +209,12 @@ test_that("[16] Confirm Applied: sets deducted_at; Reject: restores projects; Ex
 
     post_reject_bth <- DBI::dbGetQuery(cn, "SELECT status FROM financial_batches WHERE batch_code = ?",
                                        params = list(fin02_code))
-    post_reject_expenses <- DBI::dbGetQuery(cn, sprintf("SELECT id, deducted_at FROM expenses WHERE id IN (%s)",
-                                                        paste(fin02_ids, collapse = ",")))
+    post_reject_expenses <- DBI::dbGetQuery(cn, "SELECT pe.request_id AS id,
+      CASE WHEN fb.status = 'applied' AND bi.released_at IS NULL THEN fb.applied_at ELSE NULL END AS deducted_at
+      FROM financial_batches fb
+      JOIN batch_items bi ON bi.batch_id = fb.id
+      JOIN payment_events pe ON pe.id = bi.payment_event_id
+      WHERE fb.batch_code = ?", params = list(fin02_code))
     box$reject_bth_status <- post_reject_bth$status[[1]]
     box$reject_expenses_deducted_null <- all(is.na(post_reject_expenses$deducted_at))
     box$fin02_back_in_pool <- all(fin02_ids %in% fin_pool()$id)

@@ -1,2 +1,0 @@
-# Copy to .Renviron and fill in locally. Do not commit secrets.
-TRACKER_DB_PATH=

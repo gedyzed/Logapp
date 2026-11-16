@@ -8,26 +8,26 @@ test_that("[3] Full request lifecycle: Create, Proceed, Pay, Cancel stay in step
 
   # 1. Create a new request in SQLite -> starts as under_review
   new_id <- tracker_insert(cn, "INT-TEST-REQ", "ALPHA", "COMMS", "under_review", amount = 3100, currency = "ETB")
-  row1 <- DBI::dbGetQuery(cn, "SELECT status FROM expenses WHERE id = ?", params = list(new_id))
+  row1 <- DBI::dbGetQuery(cn, "SELECT status FROM requests WHERE id = ?", params = list(new_id))
   box$status_new <- row1$status[[1]]
 
   # 2. Proceed: moves under_review -> pending
-  DBI::dbExecute(cn, "UPDATE expenses SET status = 'pending', po = 'PO/TEST/001', po_date = '2026-11-04' WHERE id = ?",
+  DBI::dbExecute(cn, "UPDATE requests SET status = 'pending', po_reference = 'PO/TEST/001', po_date = '2026-11-04' WHERE id = ?",
                  params = list(new_id))
-  row2 <- DBI::dbGetQuery(cn, "SELECT status, po FROM expenses WHERE id = ?", params = list(new_id))
+  row2 <- DBI::dbGetQuery(cn, "SELECT status, po_reference AS po FROM requests WHERE id = ?", params = list(new_id))
   box$status_proceed <- row2$status[[1]]
 
   # 3. Pay: moves pending -> paid
-  DBI::dbExecute(cn, "UPDATE expenses SET status = 'paid', payment_date = '2026-11-06' WHERE id = ?",
+  DBI::dbExecute(cn, "UPDATE requests SET status = 'paid' WHERE id = ?",
                  params = list(new_id))
-  row3 <- DBI::dbGetQuery(cn, "SELECT status, payment_date FROM expenses WHERE id = ?", params = list(new_id))
+  row3 <- DBI::dbGetQuery(cn, "SELECT status FROM requests WHERE id = ?", params = list(new_id))
   box$status_paid <- row3$status[[1]]
 
   # 4. Cancel: moves to cancelled
   cancel_id <- tracker_insert(cn, "INT-CANCEL-REQ", "ALPHA", "COMMS", "under_review")
-  DBI::dbExecute(cn, "UPDATE expenses SET status = 'cancelled', reason = 'Duplicate entry' WHERE id = ?",
+  DBI::dbExecute(cn, "UPDATE requests SET status = 'cancelled', cancellation_reason = 'Duplicate entry' WHERE id = ?",
                  params = list(cancel_id))
-  row4 <- DBI::dbGetQuery(cn, "SELECT status, reason FROM expenses WHERE id = ?", params = list(cancel_id))
+  row4 <- DBI::dbGetQuery(cn, "SELECT status, cancellation_reason AS reason FROM requests WHERE id = ?", params = list(cancel_id))
   box$status_cancelled <- row4$status[[1]]
 
   expect_req("3", {
@@ -68,8 +68,8 @@ test_that("[4] Edit request updates fields while preserving status", {
   id <- tracker_insert(cn, "ORIG-DESC", "ALPHA", "COMMS", "under_review", amount = 1000)
   
   # Simulate update_expense_row with edit payload
-  DBI::dbExecute(cn, "UPDATE expenses SET description = 'EDITED-DESC', amount = 1200 WHERE id = ?", params = list(id))
-  updated <- DBI::dbGetQuery(cn, "SELECT description, amount, status FROM expenses WHERE id = ?", params = list(id))
+  DBI::dbExecute(cn, "UPDATE requests SET description = 'EDITED-DESC', amount = 1200 WHERE id = ?", params = list(id))
+  updated <- DBI::dbGetQuery(cn, "SELECT description, amount, status FROM requests WHERE id = ?", params = list(id))
 
   expect_req("4", {
     expect_equal(updated$description[[1]], "EDITED-DESC")
