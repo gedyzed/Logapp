@@ -1,144 +1,235 @@
-%% Relationship overview; full fields, nullability and composite constraints: DATABASE_DESIGN.md
+---
+title: Logapp database v1.2
+---
 erDiagram
-    budgets ||--o{ budget_lines : "1 : 0..N"
-    budget_lines ||--o{ requests : "1 : 0..N"
-    areas ||--o{ requests : "1 : 0..N"
-    contacts ||--o{ requests : "required requester"
-    contacts o|--o{ requests : "optional focal"
-    contacts o|--o{ requests : "supplier assigned at approval"
-    requests ||--|{ request_state_events : "1 : 1..N"
-    requests ||--o| payment_events : "1 : 0..1"
-    fx_rate_sets ||--|{ fx_rates : "1 : 4 when published"
-    fx_rate_sets o|--o{ requests : "optional entry rate set"
-    fx_rate_sets ||--o{ payment_events : "1 : 0..N"
-    budgets ||--o{ payment_events : "snapshot budget"
-    budget_lines ||--o{ payment_events : "snapshot line"
-    checkpoint_batches ||--|{ checkpoint_budgets : "1 : 1..N"
-    budgets ||--o{ checkpoint_budgets : "historical memberships"
-    checkpoint_budgets ||--|{ checkpoint_lines : "1 : 1..N"
-    budget_lines ||--o{ checkpoint_lines : "historical line totals"
-    checkpoint_lines ||--|{ checkpoint_items : "1 : 1..N"
-    payment_events ||--o{ checkpoint_items : "historical memberships"
-    weekly_notification_runs ||--o{ email_deliveries : "1 : 0..N"
-    email_recipients ||--o{ email_deliveries : "1 : 0..N"
-    budgets {
-        uuid id PK
-        string code UK
-        boolean active
-    }
-    budget_lines {
-        uuid id PK
-        uuid budget_id FK
-        string code
-    }
-    areas {
-        uuid id PK
-        string code UK
-        string country_code
-    }
-    contacts {
-        uuid id PK
-        string kind
-        string display_name
-    }
-    requests {
-        uuid id PK
-        uuid submission_key UK
-        uuid budget_line_id FK
-        uuid area_id FK
-        uuid requester_id FK
-        uuid focal_id FK
-        uuid supplier_id FK
-        uuid entry_rate_set_id FK
-        string status
-        timestamp registered_at
-        timestamp pending_entered_at
-        timestamp pending_exited_at
-    }
-    request_state_events {
-        uuid id PK
-        uuid request_id FK
-        string to_status
-        timestamp occurred_at
-    }
-    fx_rate_sets {
-        uuid id PK
-        date effective_date
-        string buying_type
-        timestamp published_at
-    }
-    fx_rates {
-        uuid rate_set_id PK, FK
-        string currency PK
-        numeric etb_per_unit
-    }
-    payment_events {
-        uuid id PK
-        uuid request_id FK, UK
-        uuid budget_id FK
-        uuid budget_line_id FK
-        uuid rate_set_id FK
-        numeric usd_value
-        date payment_date
-    }
-    checkpoint_batches {
-        uuid id PK
-        string reference UK
-        string status
-        string currency
-        timestamp sealed_at
-        timestamp applied_at
-    }
-    checkpoint_budgets {
-        uuid batch_id PK, FK
-        uuid budget_id PK, FK
-        timestamp reservation_released_at
-    }
-    checkpoint_lines {
-        uuid batch_id PK, FK
-        uuid budget_line_id PK, FK
-        uuid budget_id FK
-        numeric raw_usd_total
-        numeric usd_total
-    }
-    checkpoint_items {
-        uuid id PK
-        uuid batch_id FK
-        uuid budget_id FK
-        uuid budget_line_id FK
-        uuid payment_event_id FK
-        timestamp released_at
-    }
-    email_recipients {
-        uuid id PK
-        string normalized_email UK
-        boolean active
-    }
-    weekly_notification_runs {
-        uuid id PK
-        date period_key UK
-        timestamp period_start
-        timestamp period_end
-    }
-    email_deliveries {
-        uuid id PK
-        uuid run_id FK
-        uuid recipient_id FK
-        string status
-        timestamp accepted_at
-    }
-    audit_events {
-        uuid id PK
-        string entity_type
-        uuid entity_id
-        string action
-    }
-    app_settings {
-        smallint id PK
-        bigint data_revision
-        integer pending_overdue_hours
-    }
-    schema_migrations {
-        integer version PK
-        string checksum
-    }
+  departments ||--o{ project_budgets : "department_code"
+  departments |o--o{ people : "department_code"
+  departments ||--o{ requests : "department_code"
+  currencies ||--o{ requests : "currency"
+  currencies ||--o{ payment_events : "original_currency"
+  currencies ||--o{ settings : "default / finance currency"
+  project_budgets ||--o{ budget_lines : "project_budget_id"
+  project_budgets ||--o{ batch_projects : "project_budget_id"
+  project_budgets ||--o{ payment_events : "project_budget_id"
+  budget_lines ||--o{ requests : "budget_line_id"
+  budget_lines ||--o{ payment_events : "budget_line_id"
+  areas ||--o{ requests : "area_id"
+  people ||--o{ requests : "requester_id / submitted_by_id"
+  suppliers |o--o{ requests : "supplier_id"
+  requests ||--|{ request_state_events : "request_id"
+  requests ||--o{ request_revisions : "request_id"
+  requests ||--o| payment_events : "request_id"
+  fx_rate_months ||--o{ payment_events : "fx_rate_month_id"
+  payment_events ||--o{ batch_items : "payment_event_id"
+  financial_batches ||--|{ batch_projects : "batch_id"
+  financial_batches ||--|{ batch_items : "batch_id"
+  weekly_notification_runs ||--o{ email_deliveries : "run_id"
+  email_recipients ||--o{ email_deliveries : "recipient_id"
+
+  departments {
+    varchar_20 code PK
+    varchar_100 name
+    boolean active
+  }
+  currencies {
+    char_3 code PK
+    varchar_100 name
+    boolean active
+  }
+  fx_rate_months {
+    uuid id PK
+    varchar_7 rate_month UK "YYYY-MM"
+    numeric_24_10 etb_per_eur
+    numeric_24_10 usd_per_eur
+    numeric_24_10 gbp_per_eur
+    varchar_50 source
+    timestamptz fetched_at
+  }
+  project_budgets {
+    uuid id PK
+    varchar_40 code UK "uppercase"
+    varchar_200 name
+    varchar_20 department_code FK
+    timestamptz last_checkpoint_at "nullable"
+    boolean active
+    timestamptz created_at
+    timestamptz updated_at
+  }
+  budget_lines {
+    uuid id PK "UK with project_budget_id"
+    uuid project_budget_id FK "UK with code"
+    varchar_40 code
+    varchar_300 description
+    boolean active
+    timestamptz created_at
+    timestamptz updated_at
+  }
+  areas {
+    uuid id PK
+    varchar_40 code UK
+    varchar_200 name
+    char_3 country_code "nullable"
+    boolean active
+    timestamptz created_at
+    timestamptz updated_at
+  }
+  people {
+    uuid id PK
+    varchar_200 full_name
+    varchar_200 email UK "lowercase"
+    varchar_20 department_code FK "nullable"
+    boolean active
+    timestamptz created_at
+    timestamptz updated_at
+  }
+  suppliers {
+    uuid id PK
+    varchar_200 supplier_name UK "lowercase"
+    varchar_200 email "nullable"
+    varchar_50 phone "nullable"
+    text notes "nullable"
+    boolean active
+    timestamptz created_at
+    timestamptz updated_at
+  }
+  requests {
+    uuid id PK
+    uuid submission_key UK "idempotency"
+    text request_reference_base "OF base"
+    integer request_reference_sequence "UK with base"
+    text request_reference UK "generated"
+    text po_reference_base "nullable"
+    integer po_reference_sequence "nullable"
+    text po_reference UK "generated, nullable"
+    uuid budget_line_id FK
+    uuid area_id FK
+    varchar_20 department_code FK
+    uuid requester_id FK "people"
+    uuid submitted_by_id FK "people"
+    uuid supplier_id FK "nullable until pending"
+    text description
+    numeric_14_3 quantity "nullable"
+    varchar_80 unit "nullable"
+    numeric_20_8 amount
+    char_3 currency FK
+    char_1 scenario "A to G"
+    integer expected_days
+    text waiver_memo "nullable"
+    text remarks "nullable"
+    date order_date
+    varchar_160 po_reason "nullable"
+    date po_date "nullable"
+    date due_date "generated"
+    varchar_20 status "under_review|pending|paid|cancelled"
+    timestamptz registered_at "immutable"
+    timestamptz status_changed_at
+    timestamptz pending_entered_at "nullable"
+    timestamptz cancelled_at "nullable"
+    text cancellation_reason "nullable"
+    timestamptz edited_at "nullable"
+    integer edit_count
+    timestamptz deleted_at "nullable, soft delete"
+    timestamptz updated_at
+    integer version
+  }
+  request_state_events {
+    uuid id PK
+    uuid request_id FK "UK with event_number"
+    integer event_number
+    uuid operation_key UK "idempotency"
+    varchar_20 from_status "nullable"
+    varchar_20 to_status
+    timestamptz occurred_at
+    integer actual_days "nullable, whole days"
+    integer delay_days "nullable"
+    boolean is_delayed "generated"
+    text remarks "nullable"
+  }
+  request_revisions {
+    uuid id PK
+    uuid request_id FK "UK with revision_no"
+    integer revision_no
+    timestamptz changed_at
+    varchar_20 status_at_edit "under_review|pending"
+    jsonb changed_fields "old and new values"
+  }
+  payment_events {
+    uuid id PK
+    uuid request_id FK, UK "1:1"
+    uuid project_budget_id FK "snapshot, composite FK"
+    uuid budget_line_id FK "snapshot, composite FK"
+    numeric_20_8 original_amount
+    char_3 original_currency FK
+    date payment_date "po_date..today"
+    varchar_50 payment_method
+    timestamptz recorded_at
+    uuid fx_rate_month_id FK
+    boolean fx_is_fallback
+    numeric_28_8 etb_value
+    numeric_28_8 usd_value
+    numeric_28_8 eur_value
+    numeric_28_8 gbp_value
+    text remarks "nullable"
+  }
+  financial_batches {
+    uuid id PK
+    varchar_40 batch_code UK "FB-YYYY-NNN"
+    varchar_20 status "draft|applied|abandoned"
+    timestamptz prepared_at
+    timestamptz applied_at "nullable"
+    timestamptz abandoned_at "nullable"
+    numeric_20_2 total_gbp
+    text remarks "nullable"
+  }
+  batch_projects {
+    uuid id PK
+    uuid batch_id FK "UK with project"
+    uuid project_budget_id FK "UK where draft_lock"
+    boolean draft_lock "true only while draft"
+  }
+  batch_items {
+    uuid id PK
+    uuid batch_id FK "UK with payment_event"
+    uuid payment_event_id FK "UK where unreleased"
+    numeric_20_2 gbp_amount
+    timestamptz released_at "nullable"
+  }
+  email_recipients {
+    uuid id PK
+    varchar_200 display_name
+    varchar_255 email UK "lowercase"
+    boolean active
+    timestamptz created_at
+    timestamptz updated_at
+    timestamptz deactivated_at "nullable"
+  }
+  weekly_notification_runs {
+    uuid id PK
+    date period_key UK "Friday date"
+    timestamptz period_start
+    timestamptz period_end
+    timestamptz created_at
+  }
+  email_deliveries {
+    uuid id PK
+    uuid run_id FK "UK with recipient"
+    uuid recipient_id FK
+    varchar_20 status "queued|sending|sent|failed"
+    integer attempt_count
+    timestamptz last_attempt_at "nullable"
+    timestamptz accepted_at "nullable"
+    text error_message "nullable"
+    timestamptz created_at
+    timestamptz updated_at
+  }
+  settings {
+    smallint id PK "always 1"
+    varchar_80 business_timezone
+    time weekly_cutoff_local
+    char_3 default_currency FK "ETB"
+    char_3 finance_currency FK "GBP"
+    char_3 default_country "ETH"
+    integer notification_catchup_hours
+    text application_base_url
+    timestamptz updated_at
+  }

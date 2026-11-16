@@ -2,7 +2,7 @@ cache_choices <- function(d, id) {
   vals <- uniq(unlist(d[CACHE[[id]]], use.names = FALSE))
   if (identical(id, "supplier")) vals <- supplier_catalog_db(active_only = TRUE)
   if (id %in% c("requested_by", "submitted_by")) {
-    people <- db_get("SELECT full_name FROM people WHERE active=1 ORDER BY full_name COLLATE NOCASE")$full_name
+    people <- db_get("SELECT full_name FROM people WHERE active ORDER BY lower(full_name)")$full_name
     vals <- uniq(c(vals, people))
   }
   vals
@@ -307,6 +307,7 @@ body{background:var(--app-bg);color:var(--bs-body-color);font-size:.92rem;font-w
 .navbar .nav-link[data-value='new'],.navbar .nav-link[data-value='manage']{display:none!important}
 .navbar .navbar-brand,a.brand{display:inline-flex!important;flex-direction:row!important;align-items:center!important;gap:.55rem!important;white-space:nowrap;color:var(--nav-fg)!important;text-decoration:none;line-height:1}
 .brand-mark{width:2.15rem;height:2.15rem;flex:0 0 auto;border-radius:.5rem;background:#0284C7;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:.95rem;letter-spacing:-.04em}
+img.brand-mark{background:transparent!important;object-fit:contain;display:block}
 .brand-copy{display:flex!important;flex-direction:column!important;align-items:flex-start;justify-content:center;line-height:1;width:auto}
 .brand-name{display:block;font-weight:700;letter-spacing:-.03em;font-size:1rem;line-height:1.05;color:#fff}
 .brand-sub{display:block;margin-top:.14rem;font-size:.48rem;font-weight:600;letter-spacing:.08em;line-height:1;text-transform:uppercase;color:rgba(255,255,255,.72);white-space:nowrap}
@@ -806,11 +807,12 @@ body:not(.modal-open) .modal-backdrop{display:none!important;pointer-events:none
 .insights-line-fill.is-cancelled{background:var(--status-rejected)}
 .insights-line-meta{font-size:.78rem;font-weight:650;color:var(--app-muted-fg);white-space:nowrap;display:inline-flex;align-items:center}
 .insights-line-chevron{color:#64748b;font-size:1rem;margin-left:.4rem;font-weight:600;line-height:1}
-#insights_footer{margin-top:auto;flex:0 0 auto;width:100%}
+#insights_footer{display:block;margin-top:auto;flex:0 0 auto;width:100%}
 .insights-footer{margin-top:auto;padding-top:.65rem;border-top:1px solid var(--app-border);color:var(--app-muted-fg);font-size:.78rem;display:flex;align-items:center;gap:.45rem;width:100%}
 .insights-empty{color:var(--app-muted-fg);text-align:center;padding:1.1rem .5rem}
 .insights-chart-stage{flex:1 1 auto;display:flex;flex-direction:column;min-height:340px}
-.insights-chart-stage>.shiny-panel-conditional:not([style*='display: none']){flex:1 1 auto;display:flex!important;flex-direction:column;min-height:340px}
+.insights-chart-stage>.shiny-panel-conditional{display:none}
+.insights-chart-stage>.shiny-panel-conditional.shiny-conditional--shown{flex:1 1 auto;display:flex;flex-direction:column;min-height:340px}
 .insights-chart-panel{display:flex;flex-direction:column;flex:1 1 auto;min-height:320px}
 .insights-empty-fill{flex:1 1 auto;display:flex;align-items:center;justify-content:center;min-height:240px;margin:0}
 .insights-page{max-width:1900px;width:100%;margin:0 auto;padding:1.2rem clamp(.8rem,1.6vw,1.8rem) 1.25rem;display:flex;flex-direction:column}
@@ -820,7 +822,8 @@ body:not(.modal-open) .modal-backdrop{display:none!important;pointer-events:none
 .insights-page .insights-main{min-width:0;display:flex}
 .insights-page .insights-chart-card{flex:1 1 auto;width:100%;margin:0;display:flex;flex-direction:column;min-height:510px}
 .insights-page .insights-chart-card>.card-header{flex:0 0 auto}
-.insights-page .insights-chart-card>.card-body{flex:1 1 auto;padding:.75rem .9rem .8rem;display:flex;flex-direction:column}
+.insights-page .insights-chart-card>.card-body{flex:1 1 auto;padding:.75rem .9rem .8rem;display:flex;flex-direction:column;min-height:0}
+.insights-page .insights-chart-card>.card-body>.card-body{flex:1 1 auto;display:flex;flex-direction:column;min-height:0;padding:0}
 .insights-page .shiny-plot-output{margin:0}
 .insights-page .dashboard-sidebar{position:sticky;top:1rem;height:auto;max-height:calc(100vh - 6rem);overflow-y:auto;border:1px solid var(--app-border);border-radius:var(--app-radius);background:var(--app-card-bg);align-self:start}
 .filter-panel{--filter-chevron:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%2364748b' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3E%3C/svg%3E\")}

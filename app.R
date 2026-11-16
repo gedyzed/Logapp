@@ -190,6 +190,13 @@ login_style <- "
     padding-right: 3.25rem !important;
   }
 
+  .login-password-wrap input::-ms-reveal,
+  .login-password-wrap input::-ms-clear {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+
   .login-password-toggle {
     position: absolute !important;
     right: 0.7rem !important;
@@ -329,13 +336,10 @@ secured_ui <- shinymanager::secure_app(
     tags$div(
       class = "login-brand-lockup",
       style = "display: flex; align-items: center; justify-content: center; gap: 0.75rem; margin-bottom: 1.5rem;",
-      # Blue rounded square with white L
-      tags$div(
-        style = "width: 3.78rem; height: 3.78rem; border-radius: 0.9rem; background: #2563eb; display: flex; align-items: center; justify-content: center; flex-shrink: 0;",
-        tags$span(
-          style = "color: #ffffff; font-weight: 700; font-size: 2.04rem; line-height: 1; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;",
-          "L"
-        )
+      tags$img(
+        src = "logapp-logo.svg",
+        style = "width: 3.78rem; height: 3.78rem; border-radius: 0.9rem; flex-shrink: 0; object-fit: contain;",
+        alt = "Logapp"
       ),
       # Logapp & Expense Tracker text
       tags$div(

@@ -63,21 +63,27 @@ tracker_insert <- function(cn, description, project, line, status,
     deducted_at = deducted_at
   )
   insert_expense_row(cn, row)
-  as.integer(dbGetQuery(cn, "SELECT last_insert_rowid() AS id")$id[[1]])
+}
+
+tracker_seed_rates <- function(cn, month) {
+  have <- dbGetQuery(cn, "SELECT id FROM fx_rate_months WHERE rate_month = ?", params = list(month))
+  if (nrow(have)) return(invisible(FALSE))
+  eur <- unname(RATES[["EUR"]])
+  dbExecute(cn, "INSERT INTO fx_rate_months(id, rate_month, etb_per_eur, usd_per_eur, gbp_per_eur, source, fetched_at)
+                 VALUES(?,?,?,?,?,?,?)",
+            params = list(new_uuid(), month,
+                          unname(RATES[["ETB"]]) / eur,
+                          unname(RATES[["USD"]]) / eur,
+                          unname(RATES[["GBP"]]) / eur,
+                          "euroinfo", "2026-11-01 00:00:00"))
 }
 
 tracker_seed <- function(db_path) {
   cn <- con()
-  on.exit(dbDisconnect(cn), add = TRUE)
-  stamp <- "2026-10-01 08:00:00"
-  dbExecute(cn, "INSERT INTO people(full_name, department, active, created, updated) VALUES(?,?,1,?,?)",
-            params = list("Gedion", "REACH", stamp, stamp))
-  dbExecute(cn, "INSERT INTO people(full_name, department, active, created, updated) VALUES(?,?,1,?,?)",
-            params = list("Aster H.", "REACH", stamp, stamp))
-  dbExecute(cn, "INSERT INTO suppliers(supplier_name, active, created, updated) VALUES(?,1,?,?)",
-            params = list("Beacon Travel", stamp, stamp))
+  on.exit(db_release(cn), add = TRUE)
+  for (month in c("2026-10", "2026-11", "2026-12")) tracker_seed_rates(cn, month)
   ensure_project_record(cn, "ALPHA", "REACH", "Nekemte")
-  alpha_id <- as.integer(dbGetQuery(cn, "SELECT id FROM projects WHERE project_code = 'ALPHA'")$id[[1]])
+  alpha_id <- dbGetQuery(cn, "SELECT id FROM project_budgets WHERE code = 'ALPHA'")$id[[1]]
   ensure_budget_line_record(cn, alpha_id, "COMMS")
 
   ids <- list(
@@ -112,7 +118,7 @@ tracker_seed <- function(db_path) {
   for (i in 1:12) {
     code <- sprintf("FIN%02d", i)
     ensure_project_record(cn, code, "PANDA", "Mekelle")
-    project_id <- as.integer(dbGetQuery(cn, "SELECT id FROM projects WHERE project_code = ?", params = list(code))$id[[1]])
+    project_id <- dbGetQuery(cn, "SELECT id FROM project_budgets WHERE code = ?", params = list(code))$id[[1]]
     ensure_budget_line_record(cn, project_id, "OPS")
     finance[[i]] <- code
     tracker_insert(cn, paste0("FIN-PAID-", code), code, "OPS", "paid",
@@ -126,7 +132,7 @@ tracker_seed <- function(db_path) {
                                      created = "2026-10-10 10:00:00")
   ids$finance_projects <- finance
 
-  page_ids <- integer(100)
+  page_ids <- character(100)
   for (i in seq_len(100)) {
     page_ids[[i]] <- tracker_insert(
       cn, sprintf("PAGE-%03d", i), "ALPHA", "COMMS", "under_review",
@@ -135,12 +141,6 @@ tracker_seed <- function(db_path) {
   }
   ids$page_ids <- page_ids
 
-  dbExecute(cn, "CREATE TABLE IF NOT EXISTS fx (currency TEXT, etb REAL, rate_month TEXT, source TEXT)")
-  rates <- c(USD = 155, EUR = 155 / 0.92, GBP = 155 / 0.79, ETB = 1)
-  for (code in names(rates)) {
-    dbExecute(cn, "INSERT INTO fx(currency, etb, rate_month, source) VALUES(?,?,?,?)",
-              params = list(code, unname(rates[[code]]), "2026-11", "euroinfo"))
-  }
   ids
 }
 

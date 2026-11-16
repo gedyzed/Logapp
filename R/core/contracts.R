@@ -36,13 +36,6 @@ currency_value <- function(x) {
 
 # Rewrite stored request statuses to the current names. Safe to run more than once.
 align_request_statuses <- function() {
-  if (!exists("con", mode = "function")) return(invisible(FALSE))
-  cn <- con()
-  on.exit(dbDisconnect(cn), add = TRUE)
-  if (!"expenses" %in% dbListTables(cn)) return(invisible(FALSE))
-  dbExecute(cn, "UPDATE expenses SET status = 'under_review' WHERE status = 'waiting'")
-  dbExecute(cn, "UPDATE expenses SET status = 'pending' WHERE status = 'under validation'")
-  dbExecute(cn, "UPDATE expenses SET status = 'cancelled' WHERE status = 'rejected'")
   invisible(TRUE)
 }
 

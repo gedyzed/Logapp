@@ -1,5 +1,5 @@
 # Check dependencies up front so the R console reports actionable startup errors.
-required_packages <- c("shiny", "bslib", "DBI", "RSQLite", "DT", "dplyr",
+required_packages <- c("shiny", "bslib", "DBI", "RSQLite", "RPostgres", "DT", "dplyr",
                        "writexl", "ggplot2", "scales", "shinymanager")
 missing_packages <- required_packages[
   !vapply(required_packages, requireNamespace, logical(1), quietly = TRUE)
@@ -23,6 +23,7 @@ library(shiny)
 library(bslib)
 library(DBI)
 library(RSQLite)
+library(RPostgres)
 library(DT)
 library(dplyr)
 library(writexl)
@@ -69,19 +70,37 @@ configured_app_dir <- if (exists("APP_DIR", inherits = TRUE) &&
 } else {
   normalizePath(getwd(), winslash = "/", mustWork = FALSE)
 }
-# By default, use tracker.db beside app.R. An explicit path can be supplied when
-# launching the app, which avoids accidentally opening a different/empty database.
+# Tests set TRACKER_DB_PATH to a temporary SQLite file. The live app uses Neon.
+# DATABASE_URL_POOLED (or db_url_pooled) is the app connection.
+# DATABASE_URL (or Db_url) is the direct connection, used only by scripts/migrate.R.
+env_first <- function(...) {
+  for (name in list(...)) {
+    value <- trimws(Sys.getenv(name, unset = ""))
+    if (nzchar(value)) return(value)
+  }
+  ""
+}
 configured_db <- trimws(Sys.getenv("TRACKER_DB_PATH", unset = ""))
-db_target <- if (nzchar(configured_db)) path.expand(configured_db) else file.path(configured_app_dir, "tracker.db")
-if (nzchar(configured_db) && !file.exists(db_target)) {
-  stop("TRACKER_DB_PATH points to a database file that does not exist: ", db_target,
-       ". Correct the path or unset TRACKER_DB_PATH to use tracker.db beside the app.", call. = FALSE)
+pooled_url <- env_first("db_url_pooled", "DATABASE_URL_POOLED")
+direct_url <- env_first("Db_url", "DATABASE_URL")
+if (nzchar(configured_db)) {
+  db_target <- path.expand(configured_db)
+  if (!file.exists(db_target)) {
+    stop("TRACKER_DB_PATH points to a database file that does not exist: ", db_target, call. = FALSE)
+  }
+  DB_DRIVER <- "sqlite"
+  DB <- normalizePath(db_target, winslash = "/", mustWork = TRUE)
+  DB_DIRECT <- ""
+  message("Expense Tracker SQLite database: ", DB)
+} else if (nzchar(pooled_url)) {
+  DB_DRIVER <- "postgres"
+  DB <- pooled_url
+  DB_DIRECT <- direct_url
+  message("Expense Tracker database: Neon (pooled connection)")
+} else {
+  stop("Set DATABASE_URL_POOLED to the Neon pooled URL, or TRACKER_DB_PATH to a SQLite file for tests.", call. = FALSE)
 }
-if (!dir.exists(dirname(db_target))) {
-  stop("The folder containing the SQLite database does not exist: ", dirname(db_target), call. = FALSE)
-}
-DB <- normalizePath(db_target, winslash = "/", mustWork = FALSE)
-message("Expense Tracker SQLite database: ", DB)
+db_is_postgres <- function() identical(DB_DRIVER, "postgres")
 CUR    <- c("ETB", "USD", "EUR", "GBP")
 STATUS <- c("under_review", "pending", "paid", "cancelled")
 status_label <- function(status) {

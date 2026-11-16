@@ -127,14 +127,9 @@
 
   observeEvent(input$project_code, {
     pc <- v(input$project_code); req(nzchar(pc))
-    p  <- db_get("SELECT department, location FROM projects WHERE project_code = ?", pc)
+    p  <- db_get("SELECT department_code AS department FROM project_budgets WHERE lower(code) = lower(?)", pc)
     if (!nrow(p)) return()
     if (nzchar(v(p$department))) updateSelectInput(session, "department", selected = p$department)
-    if (nzchar(v(p$location)))
-      updateSelectizeInput(session, "location",
-                           choices = c("", union(uniq(isolate(data())$location), p$location)),
-                           selected = p$location,
-                           options = list(create = TRUE, placeholder = "Area code, e.g. MEK"))
   }, ignoreInit = TRUE)
 
   observeEvent(input$project_code, {
@@ -225,8 +220,11 @@
       payment_date = NA_character_, remarks = nz(input$remarks),
       created      = now(), updated = now()
     )
-    cn <- con(); on.exit(dbDisconnect(cn))
-    saved <- tryCatch({ insert_expense_row(cn, row); TRUE }, error = function(e) {
+    cn <- con(); on.exit(db_release(cn))
+    saved <- tryCatch({
+      withProgress(message = "Saving request...", value = 0.4, insert_expense_row(cn, row))
+      TRUE
+    }, error = function(e) {
       showNotification(paste("Request was not saved:", conditionMessage(e)), type = "error"); FALSE
     })
     if (!saved) return()
@@ -431,24 +429,11 @@
   }
 
   observeEvent(input$open_request_row, {
-    id <- suppressWarnings(as.integer(input$open_request_row$id))
-    # #region agent log
-    try(cat(sprintf("{\"sessionId\":\"3d2873\",\"hypothesisId\":\"H1\",\"location\":\"requests_modals.R:open_request_row\",\"message\":\"row click\",\"data\":{\"detail\":\"id=%s status_label=%s\"},\"timestamp\":%s,\"runId\":\"pre\"}\n",
-                    paste(id, collapse = ","), exists("status_label", mode = "function"),
-                    format(as.numeric(Sys.time()) * 1000, scientific = FALSE, digits = 15)),
-             file = "c:/Users/Staff/OneDrive - ACTED/Documents/Projects/expense-tracker-acted/.cursor/debug-3d2873.log", append = TRUE), silent = TRUE)
-    # #endregion
-    if (length(id) != 1L || is.na(id)) { showNotification("Could not identify that request.", type = "warning"); return() }
+    id <- as.character(input$open_request_row$id)
+    id <- id[!is.na(id) & nzchar(id)]
+    if (length(id) != 1L) { showNotification("Could not identify that request.", type = "warning"); return() }
     edit_id(id)
-    tryCatch(render_request_modal(id, edit_mode = FALSE), error = function(e) {
-      # #region agent log
-      try(cat(sprintf("{\"sessionId\":\"3d2873\",\"hypothesisId\":\"H1\",\"location\":\"requests_modals.R:render_request_modal\",\"message\":\"modal failed\",\"data\":{\"detail\":\"%s\"},\"timestamp\":%s,\"runId\":\"pre\"}\n",
-                      gsub("\"", "'", conditionMessage(e)),
-                      format(as.numeric(Sys.time()) * 1000, scientific = FALSE, digits = 15)),
-               file = "c:/Users/Staff/OneDrive - ACTED/Documents/Projects/expense-tracker-acted/.cursor/debug-3d2873.log", append = TRUE), silent = TRUE)
-      # #endregion
-      stop(e)
-    })
+    render_request_modal(id, edit_mode = FALSE)
   })
   observeEvent(input$start_edit_modal, {
     id <- edit_id()
@@ -510,11 +495,11 @@
       order_date   = order_date, po_date = as.character(old$po_date),
       order_form   = order_ref, po = if (nzchar(v(old$po))) v(old$po) else NA_character_,
       payment_date = as.character(old$payment_date), updated = now())
-    cn <- con(); on.exit(dbDisconnect(cn))
-    if (nzchar(v(row$supplier)))
-      dbExecute(cn, "INSERT OR IGNORE INTO suppliers(supplier_name,active,created,updated) VALUES(?,1,?,?)",
-                params = list(v(row$supplier), now(), now()))
-    saved <- tryCatch({ update_expense_row(cn, id, row); TRUE }, error = function(e) {
+    cn <- con(); on.exit(db_release(cn))
+    saved <- tryCatch({
+      withProgress(message = "Saving request...", value = 0.4, update_expense_row(cn, id, row))
+      TRUE
+    }, error = function(e) {
       showNotification(paste("Request was not updated:", conditionMessage(e)), type = "error"); FALSE })
     if (!saved) return()
     removeModal(); showNotification("Request updated.", type = "message")
@@ -557,10 +542,7 @@
     po_ref <- mk_ref(rec, "PO")
     if (is.na(po_ref) || !nzchar(v(po_ref))) {
       showNotification("Could not generate PO reference. Check project, area, department, reason and date.", type = "error"); return() }
-    cn <- con(); on.exit(dbDisconnect(cn))
-    if (nzchar(supplier))
-      dbExecute(cn, "INSERT OR IGNORE INTO suppliers(supplier_name,active,created,updated) VALUES(?,1,?,?)",
-                params = list(supplier, now(), now()))
+    cn <- con(); on.exit(db_release(cn))
     row <- list(
       description  = v(old$description), project_code = v(old$project_code), budget_line = v(old$budget_line),
       country      = nz(old$country), location = v(old$location), department = v(old$department),
@@ -571,7 +553,10 @@
       status       = "pending", reason = reason, order_date = v(old$order_date),
       po_date      = as.character(po_date), order_form = v(old$order_form), po = po_ref,
       payment_date = NA_character_, updated = now())
-    saved <- tryCatch({ update_expense_row(cn, id, row); TRUE }, error = function(e) {
+    saved <- tryCatch({
+      withProgress(message = "Saving request...", value = 0.4, update_expense_row(cn, id, row))
+      TRUE
+    }, error = function(e) {
       showNotification(paste("Could not proceed:", conditionMessage(e)), type = "error"); FALSE })
     if (!saved) return()
     removeModal()
@@ -604,7 +589,7 @@
     if (!nrow(old) || v(old$status[1]) != "pending") {
       showNotification("This request is no longer Pending.", type = "warning"); removeModal(); return() }
     old <- old[1, , drop = FALSE]
-    cn  <- con(); on.exit(dbDisconnect(cn))
+    cn  <- con(); on.exit(db_release(cn))
     row <- list(
       description  = v(old$description), project_code = v(old$project_code), budget_line = v(old$budget_line),
       country      = nz(old$country), location = v(old$location), department = v(old$department),
@@ -615,7 +600,10 @@
       status       = "paid", reason = v(old$reason), order_date = v(old$order_date),
       po_date      = as.character(old$po_date), order_form = v(old$order_form), po = v(old$po),
       payment_date = as.character(input$pay_date), updated = now())
-    saved <- tryCatch({ update_expense_row(cn, id, row); TRUE }, error = function(e) {
+    saved <- tryCatch({
+      withProgress(message = "Saving request...", value = 0.4, update_expense_row(cn, id, row))
+      TRUE
+    }, error = function(e) {
       showNotification(paste("Could not mark paid:", conditionMessage(e)), type = "error"); FALSE })
     if (!saved) return()
     reload_expenses()
@@ -650,7 +638,7 @@
       showNotification("This request cannot be cancelled from its current status.", type = "warning")
       removeModal(); return() }
     old <- old[1, , drop = FALSE]
-    cn  <- con(); on.exit(dbDisconnect(cn))
+    cn  <- con(); on.exit(db_release(cn))
     row <- list(
       description  = v(old$description), project_code = v(old$project_code), budget_line = v(old$budget_line),
       country      = nz(old$country), location = v(old$location), department = v(old$department),
@@ -658,10 +646,13 @@
       quantity     = if (!is.na(old$quantity)) old$quantity else NA_real_,
       unit         = nz(old$unit), remarks = nz(old$remarks), waiver = v(old$waiver),
       amount       = old$amount, currency = v(old$currency), usd = old$usd, rate_used = old$rate_used,
-      status       = "cancelled", reason = v(old$reason), order_date = v(old$order_date),
+      status       = "cancelled", reason = v(old$reason), cancellation_reason = reason, order_date = v(old$order_date),
       po_date      = as.character(old$po_date), order_form = v(old$order_form), po = v(old$po),
       payment_date = NA_character_, updated = now())
-    saved <- tryCatch({ update_expense_row(cn, id, row); TRUE }, error = function(e) {
+    saved <- tryCatch({
+      withProgress(message = "Saving request...", value = 0.4, update_expense_row(cn, id, row))
+      TRUE
+    }, error = function(e) {
       showNotification(paste("Could not cancel:", conditionMessage(e)), type = "error"); FALSE })
     if (!saved) return()
     removeModal()
@@ -677,8 +668,9 @@
 
   # Weekly report row click: opens strictly read-only request modal (Fix Option B)
   observeEvent(input$open_weekly_row, {
-    id <- suppressWarnings(as.integer(input$open_weekly_row$id))
-    if (length(id) != 1L || is.na(id)) { showNotification("Could not identify that request.", type = "warning"); return() }
+    id <- as.character(input$open_weekly_row$id)
+    id <- id[!is.na(id) & nzchar(id)]
+    if (length(id) != 1L) { showNotification("Could not identify that request.", type = "warning"); return() }
     edit_id(id); render_request_modal(id, edit_mode = FALSE, read_only = TRUE)
   })
 

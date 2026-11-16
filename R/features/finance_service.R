@@ -155,20 +155,12 @@ fin_base <- reactive({
 })
 
 fin_projects <- reactive({
-  base <- project_catalog_view()
-  base$checkpoint <- base$last_deducted_at
-  fields <- tryCatch({
-    cn <- con()
-    on.exit(dbDisconnect(cn), add = TRUE)
-    dbListFields(cn, "projects")
-  }, error = function(e) character())
-  if ("last_checkpoint" %in% fields) {
-    extra <- db_get("SELECT project_code, COALESCE(last_checkpoint, '') AS last_checkpoint FROM projects")
-    matched <- extra$last_checkpoint[match(base$project_code, extra$project_code)]
-    use_checkpoint <- !is.na(matched) & nzchar(matched)
-    base$checkpoint[use_checkpoint] <- matched[use_checkpoint]
-  }
-  base
+  invisible(data())
+  rows <- db_get("SELECT id, code AS project_code, COALESCE(department_code, '') AS department,
+                         COALESCE(last_checkpoint_at, '') AS last_deducted_at
+                  FROM project_budgets WHERE active ORDER BY lower(code)")
+  rows$checkpoint <- rows$last_deducted_at
+  rows
 })
 
 fin_parse_ids <- function(request_ids) {
@@ -178,13 +170,7 @@ fin_parse_ids <- function(request_ids) {
   })
 }
 
-fin_load_batches <- function() {
-  rows <- db_get("SELECT id, batch_code, batch_name, project_codes, request_ids, total_amount, currency, status, created, confirmed_at
-                  FROM financial_batches ORDER BY id DESC")
-  rows$request_id_list <- if (nrow(rows)) fin_parse_ids(rows$request_ids) else vector("list", 0)
-  rows$bucket <- if (nrow(rows)) fin_status_bucket(rows$status) else character()
-  rows
-}
+fin_load_batches <- function() load_batches()
 
 fin_batches <- reactive({
   invisible(data())
@@ -219,9 +205,8 @@ fin_require_active <- function(code) {
 fin_reserved_ids <- reactive({
   batches <- fin_active_batches()
   if (!nrow(batches)) return(integer())
-  ids <- unique(unlist(batches$request_id_list, use.names = FALSE))
-  ids <- suppressWarnings(as.integer(ids))
-  ids[!is.na(ids)]
+  ids <- unique(as.character(unlist(batches$request_id_list, use.names = FALSE)))
+  ids[!is.na(ids) & nzchar(ids)]
 })
 
 # Paid lines that are not already inside an active batch. A later paid request
@@ -369,30 +354,19 @@ observeEvent(input$fin_btn_batch_create, {
     return()
   }
   projects <- sort(unique(fin_project_code(part$project_code)))
-  ids <- sort(unique(as.integer(part$id)))
-  total <- sum(replace(part$display_minor, is.na(part$display_minor), 0)) / 100
-  cur <- active_currency()
-  stamp <- now()
-  saved_code <- NULL
+  ids <- unique(as.character(part$id))
+  gbp <- if ("gbp_value" %in% names(part)) suppressWarnings(as.numeric(part$gbp_value)) else rep(NA_real_, length(ids))
   cn <- con()
-  on.exit(dbDisconnect(cn), add = TRUE)
-  for (attempt in 1:2) {
-    batch_code <- fin_next_batch_code()
-    saved <- tryCatch({
-      dbExecute(cn, "INSERT INTO financial_batches(batch_code, batch_name, project_codes, request_ids, total_amount, currency, status, created, confirmed_at) VALUES(?,?,?,?,?,?,?,?,?)",
-                params = list(batch_code, name, paste(projects, collapse = "|"), paste(ids, collapse = ","),
-                              total, cur, "active", stamp, NA))
-      TRUE
-    }, error = function(e) FALSE)
-    if (saved) {
-      saved_code <- batch_code
-      break
+  on.exit(db_release(cn), add = TRUE)
+  saved_code <- tryCatch(
+    withProgress(message = "Saving batch...", value = 0.4,
+                 create_financial_batch(cn, name, projects, ids, gbp)),
+    error = function(e) {
+      showNotification(conditionMessage(e), type = "warning")
+      NULL
     }
-  }
-  if (is.null(saved_code)) {
-    showNotification("Could not create the batch. Try again.", type = "warning")
-    return()
-  }
+  )
+  if (is.null(saved_code)) return()
   fin_batch_draft(NULL)
   removeModal()
   fin_history_tab("active")
@@ -426,11 +400,17 @@ observeEvent(input$fin_btn_reject_proceed, {
   batch <- fin_require_active(code)
   if (is.null(batch)) return()
   cn <- con()
-  on.exit(dbDisconnect(cn), add = TRUE)
-  n <- dbExecute(cn, "UPDATE financial_batches SET status = 'rejected' WHERE batch_code = ? AND status = 'active'",
-                 params = list(batch$batch_code[[1]]))
-  if (!isTRUE(n > 0)) {
+  on.exit(db_release(cn), add = TRUE)
+  rejected <- tryCatch(
+    withProgress(message = "Saving batch...", value = 0.4, reject_financial_batch(cn, batch$batch_code[[1]])),
+    error = function(e) conditionMessage(e)
+  )
+  if (identical(rejected, "inactive")) {
     showNotification("That batch is no longer active.", type = "warning")
+    return()
+  }
+  if (!isTRUE(rejected)) {
+    showNotification("Could not reject the batch. Nothing was changed.", type = "error")
     return()
   }
   fin_history_tab("rejected")
@@ -475,33 +455,13 @@ observeEvent(input$fin_btn_confirm_proceed, {
     showNotification("This batch has no requests to confirm.", type = "warning")
     return()
   }
-  projects <- fin_split_codes(batch$project_codes[[1]])
-  projects <- projects[projects != "(no project)"]
-  stamp <- now()
   code <- batch$batch_code[[1]]
   cn <- con()
-  on.exit(dbDisconnect(cn), add = TRUE)
-  has_checkpoint <- "last_checkpoint" %in% dbListFields(cn, "projects")
-  applied <- tryCatch({
-    dbWithTransaction(cn, {
-      n <- dbExecute(cn, "UPDATE financial_batches SET status = 'applied', confirmed_at = ? WHERE batch_code = ? AND status = 'active'",
-                     params = list(stamp, code))
-      if (!isTRUE(n > 0)) stop("inactive")
-      id_placeholders <- paste(rep("?", length(ids)), collapse = ",")
-      dbExecute(cn, paste0("UPDATE expenses SET deducted_at = ? WHERE id IN (", id_placeholders, ")"),
-                params = c(list(stamp), as.list(as.integer(ids))))
-      if (length(projects)) {
-        proj_placeholders <- paste(rep("?", length(projects)), collapse = ",")
-        dbExecute(cn, paste0("UPDATE projects SET last_deducted_at = ? WHERE project_code IN (", proj_placeholders, ")"),
-                  params = c(list(stamp), as.list(projects)))
-        if (has_checkpoint) {
-          dbExecute(cn, paste0("UPDATE projects SET last_checkpoint = ? WHERE project_code IN (", proj_placeholders, ")"),
-                    params = c(list(stamp), as.list(projects)))
-        }
-      }
-    })
-    TRUE
-  }, error = function(e) if (identical(conditionMessage(e), "inactive")) "inactive" else "error")
+  on.exit(db_release(cn), add = TRUE)
+  applied <- tryCatch(
+    withProgress(message = "Saving batch...", value = 0.4, apply_financial_batch(cn, code)),
+    error = function(e) if (identical(conditionMessage(e), "inactive")) "inactive" else "error"
+  )
   if (identical(applied, "inactive")) {
     showNotification("That batch is no longer active.", type = "warning")
     return()

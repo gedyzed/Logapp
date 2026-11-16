@@ -4,7 +4,7 @@ test_that("[7] Requests filtering computed independently from fixture", {
   fixture <- local_tracker_db("2026-11-06 13:00:00")
   cn <- DBI::dbConnect(RSQLite::SQLite(), fixture$path)
   on.exit(DBI::dbDisconnect(cn), add = TRUE)
-  all_rows <- DBI::dbGetQuery(cn, "SELECT e.*, p.project_code, bl.budget_line_code AS budget_line FROM expenses e LEFT JOIN budget_lines bl ON bl.id = e.budget_line_id LEFT JOIN projects p ON p.id = bl.project_id")
+  all_rows <- load_request_rows(cn)
 
   expected_nov_rows <- all_rows[format(as.Date(all_rows$order_date), "%Y-%m") == "2026-11", ]
   expected_oct_rows <- all_rows[format(as.Date(all_rows$order_date), "%Y-%m") == "2026-10", ]

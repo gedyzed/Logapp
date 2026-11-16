@@ -69,7 +69,7 @@
   
   # ---- Insights snapshot: the drawer edits a draft; Show results commits it ----
   insights_query <- reactiveVal(list(
-    month = last_month(),
+    month = format(app_today(), "%Y-%m"),
     projects = character(),
     department = "",
     scenario = ""
@@ -252,8 +252,8 @@
     codes <- sort(unique(c(project_codes_db(), uniq(d$project_code))))
     codes <- codes[!is.na(codes) & nzchar(codes)]
     dept_db <- tryCatch(
-      db_get("SELECT DISTINCT TRIM(department) AS department FROM projects
-              WHERE department IS NOT NULL AND TRIM(department) <> ''"),
+      db_get("SELECT DISTINCT TRIM(department_code) AS department FROM project_budgets
+              WHERE department_code IS NOT NULL AND TRIM(department_code) <> ''"),
       error = function(e) data.frame(department = character())
     )
     deps <- sort(unique(c(as.character(dept_db$department), uniq(d$department))))
@@ -273,7 +273,7 @@
     if (!client_ready) {
       sel <- "all"
       dep_sel <- isolate(insights_query()$department %||% "")
-      month_sel <- isolate(insights_query()$month %||% last_month())
+      month_sel <- isolate(insights_query()$month %||% format(app_today(), "%Y-%m"))
       scen_sel <- isolate(insights_query()$scenario %||% "")
     } else {
       raw_project <- as.character(isolate(input$insights_project) %||% "")
@@ -297,7 +297,7 @@
     month_opts <- month_choices(months)
     if (!length(month_opts)) month_opts <- month_choices(c(last_month(), format(app_today(), "%Y-%m")))
     month_opts <- c(c("All months" = ""), month_opts)
-    if (nzchar(month_sel) && !month_sel %in% as.character(month_opts)) month_sel <- last_month()
+    if (nzchar(month_sel) && !month_sel %in% as.character(month_opts)) month_sel <- format(app_today(), "%Y-%m")
     sig <- paste(paste(codes, collapse = "\n"), sel,
                  paste(deps, collapse = "\n"), dep_sel,
                  paste(scen_vals, collapse = "\n"), scen_sel,
