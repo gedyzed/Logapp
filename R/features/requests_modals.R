@@ -10,12 +10,12 @@
 
   area_rows <- reactiveVal(areas_catalog_db())
   people_names <- reactiveVal(people_names_db())
-  observe({
-    if (!exists("manage_revision", mode = "function")) return()
-    manage_revision()
-    area_rows(areas_catalog_db())
-    people_names(people_names_db())
-  }, ignoreInit = TRUE)
+  if (exists("manage_revision", mode = "function")) {
+    observeEvent(manage_revision(), {
+      area_rows(areas_catalog_db())
+      people_names(people_names_db())
+    }, ignoreInit = TRUE)
+  }
 
   area_choice_list <- function(rows) {
     if (is.null(rows) || !nrow(rows)) return(c("Select area" = ""))
