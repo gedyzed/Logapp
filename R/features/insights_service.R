@@ -249,6 +249,9 @@
   observeEvent(input$insights_month, insights_inputs_ready(TRUE), once = TRUE)
   observe({
     d <- data()
+    if (exists("view_generation", mode = "function")) view_generation()
+    tab <- as.character(isolate(input$nav) %||% "")
+    if (length(tab) && nzchar(tab[[1]]) && !identical(tab[[1]], "dashboards")) return()
     codes <- sort(unique(c(project_codes_db(), uniq(d$project_code))))
     codes <- codes[!is.na(codes) & nzchar(codes)]
     dept_db <- tryCatch(

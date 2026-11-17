@@ -127,6 +127,33 @@ project_codes_db <- function() {
   as.character(z$project_code)
 }
 
+areas_catalog_db <- function() {
+  db_get("SELECT code, name FROM areas WHERE active ORDER BY lower(code)")
+}
+
+people_names_db <- function() {
+  z <- db_get("SELECT full_name FROM people WHERE active ORDER BY lower(full_name)")
+  uniq(as.character(z$full_name))
+}
+
+# Department and active lines for one project. Not the full budget-line catalogue.
+project_form_db <- function(project_code) {
+  code <- trimws(as.character(project_code %||% ""))
+  empty <- list(department = "", lines = character())
+  if (!nzchar(code)) return(empty)
+  rows <- db_get("SELECT p.department_code AS department, bl.code AS budget_line_code
+                  FROM project_budgets p
+                  LEFT JOIN budget_lines bl ON bl.project_budget_id = p.id AND bl.active
+                  WHERE lower(p.code) = lower(?)
+                  ORDER BY lower(bl.code)", code)
+  if (!nrow(rows)) return(empty)
+  department <- as.character(rows$department[[1]])
+  if (!length(department) || is.na(department[[1]])) department <- "" else department <- department[[1]]
+  lines <- as.character(rows$budget_line_code)
+  lines <- unique(lines[!is.na(lines) & nzchar(lines)])
+  list(department = department, lines = lines)
+}
+
 budget_catalog_db <- function(project_codes = character()) {
   z <- db_get("SELECT bl.id, p.code AS project_code, bl.code AS budget_line_code
                FROM budget_lines bl JOIN project_budgets p ON p.id = bl.project_budget_id

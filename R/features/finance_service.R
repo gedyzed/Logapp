@@ -142,10 +142,31 @@ fin_next_batch_code <- function() {
   sprintf("BTH-%04d", n)
 }
 
+# Paid requests with no applied or active batch membership. Batch status decides
+# readiness. Checkpoint time is a label only and is not read here.
+fin_ready_ids <- reactive({
+  invisible(data())
+  if (exists("view_generation", mode = "function")) view_generation()
+  rows <- db_get("SELECT r.id
+                  FROM requests r
+                  WHERE r.deleted_at IS NULL
+                    AND r.status = 'paid'
+                    AND NOT EXISTS (
+                      SELECT 1
+                      FROM payment_events pe
+                      JOIN batch_items bi ON bi.payment_event_id = pe.id
+                      JOIN financial_batches fb ON fb.id = bi.batch_id
+                      WHERE pe.request_id = r.id
+                        AND fb.status IN ('applied', 'active')
+                    )")
+  if (!nrow(rows)) return(character())
+  as.character(rows$id)
+})
+
 fin_base <- reactive({
   d <- data()
-  undeducted <- is.na(d$deducted_at) | !nzchar(trimws(as.character(d$deducted_at)))
-  d <- d[d$status == "paid" & undeducted, , drop = FALSE]
+  ready <- fin_ready_ids()
+  d <- d[d$status == "paid" & as.character(d$id) %in% ready, , drop = FALSE]
   d$amount_minor_value <- fin_amount_minor(d)
   d$display_minor <- fin_to_display_minor(
     d$amount_minor_value, d$currency, active_currency(), fin_effective_rates()
@@ -154,13 +175,14 @@ fin_base <- reactive({
   d
 })
 
-fin_projects <- reactive({
+fin_checkpoint_labels <- reactive({
   invisible(data())
-  rows <- db_get("SELECT id, code AS project_code, COALESCE(department_code, '') AS department,
-                         COALESCE(last_checkpoint_at, '') AS last_deducted_at
-                  FROM project_budgets WHERE active ORDER BY lower(code)")
-  rows$checkpoint <- rows$last_deducted_at
-  rows
+  if (exists("view_generation", mode = "function")) view_generation()
+  db_get("SELECT pb.code AS project_code, fb.applied_at AS checkpoint
+          FROM financial_batches fb
+          JOIN batch_projects bp ON bp.batch_id = fb.id
+          JOIN project_budgets pb ON pb.id = bp.project_budget_id
+          WHERE fb.status = 'applied'")
 })
 
 fin_parse_ids <- function(request_ids) {
@@ -174,6 +196,7 @@ fin_load_batches <- function() load_batches()
 
 fin_batches <- reactive({
   invisible(data())
+  if (exists("view_generation", mode = "function")) view_generation()
   fin_load_batches()
 })
 
@@ -227,22 +250,23 @@ fin_project_summary <- reactive({
     pending_count = integer(), checkpoint_label = character(), stringsAsFactors = FALSE
   )
   if (!nrow(pend)) return(empty)
-  projs <- fin_projects()
-  proj_codes <- fin_project_code(projs$project_code)
+  labels <- fin_checkpoint_labels()
   codes <- fin_project_code(pend$project_code)
   totals <- split(pend$display_minor, codes)
   rows <- lapply(names(totals), function(code) {
     vals <- totals[[code]]
     vals[is.na(vals)] <- 0
-    idx <- match(code, proj_codes)
-    department <- ""
+    part <- pend[fin_project_code(pend$project_code) == code, , drop = FALSE]
+    department <- if ("department" %in% names(part)) as.character(part$department[[1]]) else ""
+    if (!length(department) || is.na(department[[1]])) department <- "" else department <- department[[1]]
     checkpoint <- ""
-    if (!is.na(idx)) {
-      if ("department" %in% names(projs)) {
-        department <- as.character(projs$department[[idx]])
-        if (!length(department) || is.na(department[[1]])) department <- "" else department <- department[[1]]
+    if (nrow(labels)) {
+      hit <- labels$checkpoint[labels$project_code == code]
+      hit <- hit[!is.na(hit)]
+      if (length(hit)) {
+        ordered <- order(as.character(hit), decreasing = TRUE)
+        checkpoint <- hit[[ordered[[1]]]]
       }
-      checkpoint <- projs$checkpoint[[idx]]
     }
     data.frame(
       project_code = code,
@@ -367,6 +391,7 @@ observeEvent(input$fin_btn_batch_create, {
     }
   )
   if (is.null(saved_code)) return()
+  if (exists("reload_expenses", mode = "function")) reload_expenses()
   fin_batch_draft(NULL)
   removeModal()
   fin_history_tab("active")
@@ -413,6 +438,7 @@ observeEvent(input$fin_btn_reject_proceed, {
     showNotification("Could not reject the batch. Nothing was changed.", type = "error")
     return()
   }
+  if (exists("reload_expenses", mode = "function")) reload_expenses()
   fin_history_tab("rejected")
   showNotification(paste("Batch", batch$batch_code[[1]], "rejected. The projects are back in the list."), type = "message")
 }, ignoreInit = TRUE)

@@ -29,32 +29,36 @@
   observeEvent(input$chip_status_rejected, toggle_request_status("cancelled"), ignoreInit = TRUE)
   
   
-  # ---- read live rows from the shared SQLite database ----
-  # Keep this connection open for PRAGMA data_version, which changes after commits
-  # by other connections (including other Shiny sessions and external writers).
-  poll_cn <- con()
-  session$onSessionEnded(function() {
-    db_release(poll_cn)
-  })
+  # Request rows load once at login, then again when this screen is opened,
+  # when Refresh is clicked, or after a successful save. No timer.
   load_expense_rows <- function(cn) load_request_rows(cn)
-  db_poll <- reactivePoll(
-    1000, session,
-    checkFunc = function() as.character(dbGetQuery(poll_cn, "SELECT data_revision FROM settings WHERE id = 1")[[1]][[1]]),
-    valueFunc = function() load_expense_rows(poll_cn)
-  )
-  # Same-session writes do not change data_version on poll_cn. Mark Paid stores a
-  # fresh read here so Financial Updates does not wait for the next poll.
   expense_rows <- reactiveVal(NULL)
-  observeEvent(db_poll(), {
-    expense_rows(db_poll())
-  }, ignoreInit = FALSE)
+  dashboard_last_refresh <- reactiveVal(Sys.time())
+  # Bumps even when the loaded rows match the previous read, so opening a tab
+  # still refreshes that tab's dropdowns.
+  view_generation <- reactiveVal(0L)
+  bump_view <- function() {
+    view_generation(isolate(view_generation()) + 1L)
+  }
   reload_expenses <- function() {
     cn <- con()
     on.exit(db_release(cn), add = TRUE)
     expense_rows(load_expense_rows(cn))
+    dashboard_last_refresh(Sys.time())
+    bump_view()
   }
-  dashboard_last_refresh <- reactiveVal(Sys.time())
-  observeEvent(db_poll(), dashboard_last_refresh(Sys.time()), ignoreInit = FALSE)
+  reload_current_screen <- function() {
+    tab <- as.character(isolate(input$nav) %||% "requests")
+    if (!length(tab) || !nzchar(tab[[1]])) tab <- "requests" else tab <- tab[[1]]
+    if (identical(tab, "manage") && exists("reload_manage", mode = "function", inherits = TRUE)) {
+      reload_manage()
+    } else {
+      reload_expenses()
+    }
+  }
+  reload_expenses()
+  observeEvent(input$nav, reload_current_screen(), ignoreInit = TRUE)
+  observeEvent(input$refresh_screen, reload_current_screen(), ignoreInit = TRUE)
   
   data <- reactive({
     d <- expense_rows()
@@ -146,6 +150,11 @@
   # constrains Budget line to that project's configured mappings.
   observe({
     d <- data()
+    view_generation()
+    # Filter choices follow the request rows. Skip this while another tab is open
+    # so a finance or manage reload does not push every Requests dropdown.
+    tab <- as.character(isolate(input$nav) %||% "")
+    if (length(tab) && nzchar(tab[[1]]) && !identical(tab[[1]], "requests")) return()
     keep <- function(id) {
       x <- isolate(input[[id]])
       if (is.null(x)) character() else as.character(x)

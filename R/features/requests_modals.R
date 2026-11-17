@@ -8,13 +8,29 @@
     "G \u2014 Framework agreement"  = "G"
   )
 
+  area_rows <- reactiveVal(areas_catalog_db())
+  people_names <- reactiveVal(people_names_db())
+  observe({
+    if (!exists("manage_revision", mode = "function")) return()
+    manage_revision()
+    area_rows(areas_catalog_db())
+    people_names(people_names_db())
+  }, ignoreInit = TRUE)
+
+  area_choice_list <- function(rows) {
+    if (is.null(rows) || !nrow(rows)) return(c("Select area" = ""))
+    code <- as.character(rows$code)
+    label <- as.character(rows$name)
+    missing <- is.na(label) | !nzchar(label)
+    label[missing] <- code[missing]
+    c("Select area" = "", setNames(code, label))
+  }
+
   # ---- New request: modal (Fix 4) ----
   observeEvent(input$new_request, {
-    DEFAULTS <<- read_app_defaults()
     touched(character()); show_all(FALSE)
-    codes          <- project_codes_db()
-    people_choices <- cache_choices(isolate(data()), "requested_by")
-    focal_choices  <- cache_choices(isolate(data()), "submitted_by")
+    codes <- project_codes_db()
+    names <- people_names()
     showModal(modalDialog(
       title = tagList(icon("plus"), " New Request"),
       size = "l", easyClose = FALSE,
@@ -23,7 +39,7 @@
           div(class = "fg",
               col(12, textAreaInput("description", R("Description"), rows = 2, width = "100%")),
               col(4, selectizeInput("requested_by", R("Requested by"),
-                                    choices = c("", people_choices), selected = "", width = "100%",
+                                    choices = c("", names), selected = "", width = "100%",
                                     options = list(create = TRUE, placeholder = "Full name of requester"))),
               col(4, selectizeInput("project_code", R("Project code"),
                                     choices = c("Select project" = "", setNames(codes, codes)),
@@ -34,9 +50,9 @@
                                     options = list(create = FALSE, placeholder = "Choose project first"))),
               col(6, pick("department", "Department", DEPTS)),
               col(6, selectizeInput("location", R("Area"),
-                                    choices = c("", uniq(isolate(data())$location)),
+                                    choices = area_choice_list(area_rows()),
                                     selected = "", width = "100%",
-                                    options = list(create = TRUE, placeholder = "Area code, e.g. MEK"))),
+                                    options = list(create = FALSE, placeholder = "Choose an area"))),
               col(6, numericInput("quantity", R("Quantity"), NA, min = 0, width = "100%")),
               col(6, selectizeInput("unit", R("Unit"),
                                     choices = c("", "Days", "Months", "Units", "Trips", "Kg", "Litres"),
@@ -54,7 +70,7 @@
               col(4, div(style = "padding-top:1.9rem",
                          checkboxInput("framework", "Framework agreement"))),
               col(4, selectizeInput("submitted_by", "Submitted by (focal point)",
-                                    choices = c("", focal_choices),
+                                    choices = c("", names),
                                     selected = DEFAULTS$submitted_by %||% "", width = "100%",
                                     options = list(create = TRUE, placeholder = "Full name of focal point"))),
               col(4, selectizeInput("country", "Country",
@@ -126,61 +142,43 @@
     department = v(input$department), order_date = as.character(odate())))
 
   observeEvent(input$project_code, {
-    pc <- v(input$project_code); req(nzchar(pc))
-    p  <- db_get("SELECT department_code AS department FROM project_budgets WHERE lower(code) = lower(?)", pc)
-    if (!nrow(p)) return()
-    if (nzchar(v(p$department))) updateSelectInput(session, "department", selected = p$department)
-  }, ignoreInit = TRUE)
-
-  observeEvent(input$project_code, {
-    pc    <- v(input$project_code)
-    lines <- if (nzchar(pc)) budget_catalog_db(pc)$budget_line_code else character()
+    pc <- v(input$project_code)
+    if (!nzchar(pc)) {
+      updateSelectizeInput(session, "budget_line",
+                           choices = c("Select budget line" = ""),
+                           selected = "",
+                           options = list(create = FALSE, placeholder = "Choose project first"))
+      return()
+    }
+    form <- project_form_db(pc)
+    if (nzchar(form$department)) updateSelectInput(session, "department", selected = form$department)
     updateSelectizeInput(session, "budget_line",
-                         choices = c("Select budget line" = "", setNames(lines, lines)),
-                         selected = character(0),
-                         options = list(create = FALSE,
-                                        placeholder = if (nzchar(pc)) "Choose a mapped budget line" else "Choose project first"))
+                         choices = c("Select budget line" = "", setNames(form$lines, form$lines)),
+                         selected = "",
+                         options = list(create = FALSE, placeholder = "Choose a mapped budget line"))
   }, ignoreInit = TRUE)
-
-  observe({
-    invisible(data())
-    codes           <- project_codes_db()
-    current_project <- isolate(input$project_code) %||% ""
-    updateSelectizeInput(session, "project_code",
-                         choices = c("Select project" = "", setNames(codes, codes)),
-                         selected = current_project,
-                         options = list(create = FALSE, placeholder = "Choose a configured project"))
-    lines         <- if (nzchar(v(current_project))) budget_catalog_db(current_project)$budget_line_code else character()
-    current_line  <- isolate(input$budget_line) %||% ""
-    selected_line <- if (current_line %in% lines) current_line else ""
-    updateSelectizeInput(session, "budget_line",
-                         choices = c("Select budget line" = "", setNames(lines, lines)),
-                         selected = selected_line,
-                         options = list(create = FALSE,
-                                        placeholder = if (nzchar(v(current_project))) "Choose a mapped budget line" else "Choose project first"))
-  })
 
   reset_form <- function() {
     updateTextAreaInput(session, "description", value = "")
-    DEFAULTS <<- read_app_defaults()
+    names <- people_names()
     updateSelectizeInput(session, "requested_by",
-                         choices = c("", cache_choices(isolate(data()), "requested_by")),
+                         choices = c("", names),
                          selected = "", options = list(create = TRUE, placeholder = "Full name of requester"))
     updateSelectizeInput(session, "submitted_by",
-                         choices = c("", cache_choices(isolate(data()), "submitted_by")),
+                         choices = c("", names),
                          selected = DEFAULTS$submitted_by %||% "",
                          options = list(create = TRUE, placeholder = "Full name of focal point"))
     updateSelectizeInput(session, "country",
                          choices = c("", uniq(c(isolate(data())$country, DEFAULTS$country))),
                          selected = DEFAULTS$country %||% "",
                          options = list(create = TRUE, placeholder = "e.g. ETH"))
-    updateSelectizeInput(session, "project_code",
-                         choices = c("Select project" = "", setNames(project_codes_db(), project_codes_db())),
-                         selected = "")
-    updateSelectizeInput(session, "budget_line", choices = character(), selected = "",
+    updateSelectizeInput(session, "project_code", selected = "")
+    updateSelectizeInput(session, "budget_line",
+                         choices = c("Select budget line" = ""), selected = "",
                          options = list(create = FALSE, placeholder = "Choose project first"))
-    updateSelectizeInput(session, "location", choices = c("", uniq(isolate(data())$location)),
-                         selected = "", options = list(create = TRUE, placeholder = "Area code, e.g. MEK"))
+    updateSelectizeInput(session, "location",
+                         choices = area_choice_list(area_rows()),
+                         selected = "", options = list(create = FALSE, placeholder = "Choose an area"))
     updateSelectizeInput(session, "unit",
                          choices = c("", "Days", "Months", "Units", "Trips", "Kg", "Litres"),
                          selected = "", options = list(create = TRUE, placeholder = "e.g. Days, Units"))
@@ -228,6 +226,7 @@
       showNotification(paste("Request was not saved:", conditionMessage(e)), type = "error"); FALSE
     })
     if (!saved) return()
+    reload_expenses()
     removeModal()
     session$sendCustomMessage("cleanupModal", list())
     showNotification("Request added.", type = "message")
@@ -384,6 +383,7 @@
                     div(class = "reference-item", div(class = "reference-label", "Purchase Order (PO)"), tags$code(class = "reference-value", po_ref))))),
         footer = footer_btns))
     } else {
+      edit_lines <- project_form_db(v(r$project_code))$lines
       showModal(modalDialog(
         title = paste0("Edit Request #", r$id), size = "l", easyClose = TRUE,
         div(class = "form-intro", "Fields marked * are required. Use Proceed / Pay / Cancel buttons to change status."),
@@ -398,8 +398,7 @@
                                       selected = v(r$project_code), width = "100%",
                                       options = list(create = FALSE, placeholder = "Choose a configured project"))),
                 col(4, selectizeInput("m_budget", "Budget line *",
-                                      choices = setNames(budget_catalog_db(v(r$project_code))$budget_line_code,
-                                                         budget_catalog_db(v(r$project_code))$budget_line_code),
+                                      choices = setNames(edit_lines, edit_lines),
                                       selected = v(r$budget_line), width = "100%",
                                       options = list(create = FALSE, placeholder = "Choose a mapped budget line"))),
                 col(4, selectInput("m_dept", "Department *", unique(c(DEPTS, v(r$department))), selected = v(r$department), width = "100%")),
@@ -449,7 +448,7 @@
 
   observeEvent(input$m_project, {
     pc    <- v(input$m_project)
-    lines <- if (nzchar(pc)) budget_catalog_db(pc)$budget_line_code else character()
+    lines <- if (nzchar(pc)) project_form_db(pc)$lines else character()
     cur   <- isolate(input$m_budget)
     keep  <- if (!is.null(cur) && cur %in% lines) cur else character(0)
     updateSelectizeInput(session, "m_budget", choices = setNames(lines, lines), selected = keep,
@@ -502,6 +501,7 @@
     }, error = function(e) {
       showNotification(paste("Request was not updated:", conditionMessage(e)), type = "error"); FALSE })
     if (!saved) return()
+    reload_expenses()
     removeModal(); showNotification("Request updated.", type = "message")
   })
 
@@ -559,6 +559,7 @@
     }, error = function(e) {
       showNotification(paste("Could not proceed:", conditionMessage(e)), type = "error"); FALSE })
     if (!saved) return()
+    reload_expenses()
     removeModal()
     session$sendCustomMessage("cleanupModal", list())
     showNotification("Request moved to Pending. PO reference generated.", type = "message")
@@ -655,6 +656,7 @@
     }, error = function(e) {
       showNotification(paste("Could not cancel:", conditionMessage(e)), type = "error"); FALSE })
     if (!saved) return()
+    reload_expenses()
     removeModal()
     session$sendCustomMessage("cleanupModal", list())
     showNotification("Request cancelled.", type = "error")
