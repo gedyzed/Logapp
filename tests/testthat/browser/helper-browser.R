@@ -22,6 +22,57 @@ tracker_table_text <- function(app) {
   app$get_js("document.querySelector('.request-table-card') ? document.querySelector('.request-table-card').innerText : ''")
 }
 
+tracker_open_tab <- function(app, value) {
+  app$run_js(sprintf(
+    "(function() {
+      var link = document.querySelector(\"a[data-value='%s']\");
+      if (link) link.click();
+    })()",
+    value
+  ))
+}
+
+tracker_finance_has <- function(needle) {
+  sprintf(
+    "var root = document.querySelector('#fin_project_cards'); root && root.innerText.indexOf('%s') >= 0 ? 'yes' : 'no'",
+    needle
+  )
+}
+
+# The catalogue is alphabetical and shows 10 rows. Search so a new code on a later page still counts.
+tracker_catalog_search <- function(app, needle) {
+  app$run_js(sprintf(
+    "(function() {
+      var input = document.querySelector('#settings_catalog_table .dataTables_filter input');
+      if (!input) return;
+      input.value = '%s';
+      input.dispatchEvent(new Event('input', {bubbles: true}));
+      if (window.jQuery) $(input).trigger('input').trigger('keyup');
+    })()",
+    needle
+  ))
+}
+
+tracker_catalog_shows <- function(needle) {
+  sprintf(
+    "var box = document.querySelector('#settings_catalog_table'); box && box.innerText.indexOf('%s') >= 0 ? 'yes' : 'no'",
+    needle
+  )
+}
+
+tracker_wait_catalog <- function(app, needle, seconds = 25) {
+  for (i in seq_len(seconds)) {
+    tracker_catalog_search(app, needle)
+    ready <- isTRUE(tryCatch(
+      identical(app$get_js(tracker_catalog_shows(needle)), "yes"),
+      error = function(e) FALSE
+    ))
+    if (ready) return(invisible(TRUE))
+    Sys.sleep(1)
+  }
+  stop("Timed out waiting for the catalogue.", call. = FALSE)
+}
+
 # The requests session polls and pushes inputs often enough that Shiny
 # may never sit idle for the 500ms shinytest2 requires. Sample the flag directly.
 tracker_install_busy_probe <- function(app) {
