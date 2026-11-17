@@ -292,6 +292,8 @@ ui <- function(request) {
       )
     ),
     nav_item(input_dark_mode(id = "mode", mode = "light")),
+    nav_item(actionButton("refresh_screen", NULL, icon = icon("rotate"),
+                          class = "nav-icon-btn", title = "Refresh this tab", `aria-label` = "Refresh this tab")),
     nav_item(actionButton("share_nav", NULL, icon = icon("share-square"),
                           class = "nav-icon-btn", title = "Share this view", `aria-label` = "Share this view")),
     nav_item(actionButton("settings_open", NULL, icon = icon("gear"),

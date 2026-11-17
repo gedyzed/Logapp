@@ -25,16 +25,18 @@
   observeEvent(input$settings_open, nav_select("nav", "manage", session = session))
   
   manage_revision <- reactiveVal(0L)
-  observe({
-    if (exists("db_poll", mode = "function")) db_poll()
+  reload_manage <- function() {
     manage_revision(isolate(manage_revision()) + 1L)
-  })
+    codes <- project_codes_db()
+    updateSelectInput(session, "cfg_budget_project",
+                      choices = c("Select project" = "", setNames(codes, codes)),
+                      selected = v(isolate(input$cfg_budget_project)))
+  }
 
   project_catalog_view <- reactive({
     manage_revision()
-    invisible(data())
     rows <- db_get("SELECT id, code AS project_code, COALESCE(department_code, '') AS department,
-                           '' AS location, COALESCE(last_checkpoint_at, '') AS last_deducted_at
+                           '' AS location
                     FROM project_budgets ORDER BY lower(code)")
     lines <- db_get("SELECT project_budget_id, code FROM budget_lines")
     rows$budget_lines <- vapply(rows$id, function(id) {
@@ -45,28 +47,24 @@
 
   supplier_catalog_view <- reactive({
     manage_revision()
-    invisible(data())
     db_get("SELECT id, supplier_name, COALESCE(email, '') AS email, COALESCE(phone, '') AS phone, active
             FROM suppliers ORDER BY lower(supplier_name)")
   })
 
   people_catalog_view <- reactive({
     manage_revision()
-    invisible(data())
     db_get("SELECT id, full_name, COALESCE(email, '') AS email, COALESCE(department_code, '') AS department, active
             FROM people ORDER BY lower(full_name)")
   })
 
   notification_catalog_view <- reactive({
     manage_revision()
-    invisible(data())
     db_get("SELECT id, email, active AS weekly_report, 0 AS request_created, 0 AS status_changed, active
             FROM email_recipients ORDER BY lower(email)")
   })
   
   output$settings_catalog_table <- renderDT({
     catalog <- project_catalog_view()
-    catalog$last_deducted_at <- NULL
     datatable(catalog, rownames = FALSE, selection = "single", filter = "none",
               options = list(pageLength = 10, lengthChange = FALSE, searching = TRUE,
                              scrollX = TRUE, dom = "ftip", columnDefs = list(
@@ -363,10 +361,11 @@
       return()
     }
     cn <- con(); on.exit(db_release(cn))
+    saved_country <- if (nzchar(country)) toupper(substr(country, 1, 3)) else "ETH"
     saved_defaults <- tryCatch({
       dbWithTransaction(cn, {
         dbExecute(cn, "UPDATE settings SET default_submitted_by = ?, default_country = ?, default_currency = ?, updated_at = ? WHERE id = 1",
-                  params = list(focal, if (nzchar(country)) toupper(substr(country, 1, 3)) else "ETH", currency, now()))
+                  params = list(focal, saved_country, currency, now()))
         bump_revision(cn)
       })
       TRUE
@@ -376,7 +375,7 @@
     })
     if (!saved_defaults) return()
     manage_revision(manage_revision() + 1L)
-    DEFAULTS <<- read_app_defaults()
+    DEFAULTS <<- list(submitted_by = focal, country = saved_country, currency = currency)
     showNotification("Request defaults saved to the database.", type = "message")
     # Apply the new defaults immediately to this session; future sessions also read them from SQLite.
     updateSelectizeInput(session, "submitted_by", selected = focal,
